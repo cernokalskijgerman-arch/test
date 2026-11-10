@@ -34,6 +34,7 @@ import kotlin.math.sin
 @Composable
 fun GlyphSimulatorView(
     modifier: Modifier = Modifier,
+    isBoosted: Boolean = false,
     onSegmentClick: ((Int) -> Unit)? = null
 ) {
     val activeDevice by GlyphController.activeDevice.collectAsState()
