@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.nothing.glyphstudio"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.nothing.glyphstudio"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
 
@@ -68,8 +68,8 @@ dependencies {
     // JSON serialization for .glyph files
     implementation("com.google.code.gson:gson:2.11.0")
 
-    // Official Nothing Glyph Developer Kit AAR
-    implementation(files("libs/glyph-matrix-sdk-2.0.aar"))
+    // Official Nothing Glyph Developer Kit AAR (from app/libs via flatDir)
+    compileOnly(name = "glyph-matrix-sdk-2.0", ext = "aar")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -6,13 +6,14 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
         maven { url = java.net.URI("https://jitpack.io") }
-        // Nothing Glyph Developer Kit repository
-        maven { url = java.net.URI("https://raw.githubusercontent.com/NothingTechnologies/Glyph-Developer-Kit/main/repository") }
+        flatDir {
+            dirs("app/libs")
+        }
     }
 }
 
