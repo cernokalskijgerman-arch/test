@@ -68,8 +68,8 @@ dependencies {
     // JSON serialization for .glyph files
     implementation("com.google.code.gson:gson:2.11.0")
 
-    // Official Nothing Glyph Developer Kit AAR (from app/libs via flatDir)
-    compileOnly(name = "glyph-matrix-sdk-2.0", ext = "aar")
+    // Official Nothing Glyph Developer Kit is provided by Nothing OS runtime via reflection in GlyphController.kt
+
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
