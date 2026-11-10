@@ -175,7 +175,7 @@ export default function GlyphCameraSilhouette({
         <Path
           d={pathTL}
           fill="none"
-          stroke="rgba(45, 45, 55, 0.45)"
+          stroke="rgba(55, 55, 68, 0.45)"
           strokeWidth="7"
           strokeLinecap="round"
         />
@@ -186,16 +186,16 @@ export default function GlyphCameraSilhouette({
             <Path
               d={pathTL}
               fill="none"
-              stroke={`rgba(255, 255, 255, ${(bTL * 0.28).toFixed(2)})`}
-              strokeWidth="20"
+              stroke={`rgba(255, 255, 255, ${(bTL * 0.32).toFixed(2)})`}
+              strokeWidth="22"
               strokeLinecap="round"
             />
             {/* Mid neon glow */}
             <Path
               d={pathTL}
               fill="none"
-              stroke={`rgba(225, 242, 255, ${(bTL * 0.65).toFixed(2)})`}
-              strokeWidth="12"
+              stroke={`rgba(230, 245, 255, ${(bTL * 0.7).toFixed(2)})`}
+              strokeWidth="13"
               strokeLinecap="round"
             />
             {/* Solid pure white core */}
@@ -203,18 +203,27 @@ export default function GlyphCameraSilhouette({
               d={pathTL}
               fill="none"
               stroke={`rgba(255, 255, 255, ${bTL.toFixed(2)})`}
-              strokeWidth="7"
+              strokeWidth="7.5"
               strokeLinecap="round"
             />
           </G>
         )}
+        {/* Invisible Wide Hit Area for Tap */}
+        <Path
+          d={pathTL}
+          fill="none"
+          stroke="rgba(0,0,0,0.001)"
+          strokeWidth="42"
+          strokeLinecap="round"
+          onPress={() => onArcPress && onArcPress(ARC_INDICES.TOP_LEFT)}
+        />
 
         {/* --- ARC 2: BOTTOM-LEFT --- */}
         {/* Inactive Base Track */}
         <Path
           d={pathBL}
           fill="none"
-          stroke="rgba(45, 45, 55, 0.45)"
+          stroke="rgba(55, 55, 68, 0.45)"
           strokeWidth="7"
           strokeLinecap="round"
         />
@@ -224,33 +233,42 @@ export default function GlyphCameraSilhouette({
             <Path
               d={pathBL}
               fill="none"
-              stroke={`rgba(255, 255, 255, ${(bBL * 0.28).toFixed(2)})`}
-              strokeWidth="20"
+              stroke={`rgba(255, 255, 255, ${(bBL * 0.32).toFixed(2)})`}
+              strokeWidth="22"
               strokeLinecap="round"
             />
             <Path
               d={pathBL}
               fill="none"
-              stroke={`rgba(225, 242, 255, ${(bBL * 0.65).toFixed(2)})`}
-              strokeWidth="12"
+              stroke={`rgba(230, 245, 255, ${(bBL * 0.7).toFixed(2)})`}
+              strokeWidth="13"
               strokeLinecap="round"
             />
             <Path
               d={pathBL}
               fill="none"
               stroke={`rgba(255, 255, 255, ${bBL.toFixed(2)})`}
-              strokeWidth="7"
+              strokeWidth="7.5"
               strokeLinecap="round"
             />
           </G>
         )}
+        {/* Invisible Wide Hit Area for Tap */}
+        <Path
+          d={pathBL}
+          fill="none"
+          stroke="rgba(0,0,0,0.001)"
+          strokeWidth="42"
+          strokeLinecap="round"
+          onPress={() => onArcPress && onArcPress(ARC_INDICES.BOTTOM_LEFT)}
+        />
 
         {/* --- ARC 3: RIGHT --- */}
         {/* Inactive Base Track */}
         <Path
           d={pathR}
           fill="none"
-          stroke="rgba(45, 45, 55, 0.45)"
+          stroke="rgba(55, 55, 68, 0.45)"
           strokeWidth="7"
           strokeLinecap="round"
         />
@@ -260,26 +278,35 @@ export default function GlyphCameraSilhouette({
             <Path
               d={pathR}
               fill="none"
-              stroke={`rgba(255, 255, 255, ${(bR * 0.28).toFixed(2)})`}
-              strokeWidth="20"
+              stroke={`rgba(255, 255, 255, ${(bR * 0.32).toFixed(2)})`}
+              strokeWidth="22"
               strokeLinecap="round"
             />
             <Path
               d={pathR}
               fill="none"
-              stroke={`rgba(225, 242, 255, ${(bR * 0.65).toFixed(2)})`}
-              strokeWidth="12"
+              stroke={`rgba(230, 245, 255, ${(bR * 0.7).toFixed(2)})`}
+              strokeWidth="13"
               strokeLinecap="round"
             />
             <Path
               d={pathR}
               fill="none"
               stroke={`rgba(255, 255, 255, ${bR.toFixed(2)})`}
-              strokeWidth="7"
+              strokeWidth="7.5"
               strokeLinecap="round"
             />
           </G>
         )}
+        {/* Invisible Wide Hit Area for Tap */}
+        <Path
+          d={pathR}
+          fill="none"
+          stroke="rgba(0,0,0,0.001)"
+          strokeWidth="42"
+          strokeLinecap="round"
+          onPress={() => onArcPress && onArcPress(ARC_INDICES.RIGHT)}
+        />
       </Svg>
     </View>
   );

@@ -119,11 +119,49 @@ export default function App() {
       {/* Persistent Floating Camera Module (NO phone body chassis) */}
       <View style={styles.simulatorContainer}>
         {!isMatrixCollapsed ? (
-          <GlyphCameraSilhouette
-            brightness={brightness}
-            onArcPress={handleArcPress}
-            size={240}
-          />
+          <>
+            <GlyphCameraSilhouette
+              brightness={brightness}
+              onArcPress={handleArcPress}
+              size={220}
+            />
+
+            {/* 3 Quick Arc Toggles */}
+            <View style={styles.arcPillRow}>
+              <TouchableOpacity
+                style={[styles.arcPill, brightness[0] > 10 && styles.arcPillActive]}
+                onPress={() => handleArcPress(0)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.arcPillDot, brightness[0] > 10 && styles.arcPillDotActive]} />
+                <Text style={[styles.arcPillText, brightness[0] > 10 && styles.arcPillTextActive]}>
+                  ВЕРХ-ЛЕВ
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.arcPill, brightness[1] > 10 && styles.arcPillActive]}
+                onPress={() => handleArcPress(1)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.arcPillDot, brightness[1] > 10 && styles.arcPillDotActive]} />
+                <Text style={[styles.arcPillText, brightness[1] > 10 && styles.arcPillTextActive]}>
+                  НИЗ-ЛЕВ
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.arcPill, brightness[2] > 10 && styles.arcPillActive]}
+                onPress={() => handleArcPress(2)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.arcPillDot, brightness[2] > 10 && styles.arcPillDotActive]} />
+                <Text style={[styles.arcPillText, brightness[2] > 10 && styles.arcPillTextActive]}>
+                  ПРАВЫЙ
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
         ) : (
           <View style={styles.collapsedBadgeRow}>
             <View style={[styles.collapsedDot, isAnyOn && styles.collapsedDotActive]} />
@@ -266,6 +304,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
+  },
+  arcPillRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    paddingHorizontal: 16,
+  },
+  arcPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  arcPillActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: 'rgba(255, 255, 255, 0.65)',
+  },
+  arcPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#444450',
+    marginRight: 6,
+  },
+  arcPillDotActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowRadius: 5,
+    shadowOpacity: 1,
+  },
+  arcPillText: {
+    fontFamily: 'NDOT57',
+    fontSize: 9,
+    color: '#777785',
+    letterSpacing: 1,
+  },
+  arcPillTextActive: {
+    color: '#FFFFFF',
   },
   collapsedBadgeRow: {
     flexDirection: 'row',
