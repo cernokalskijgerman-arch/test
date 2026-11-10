@@ -30,18 +30,18 @@ class GlyphForegroundService : Service() {
         val action = intent?.action ?: ACTION_STOP
         when (action) {
             ACTION_START_TIMER -> {
-                val durationSec = intent.getIntExtra(EXTRA_DURATION_SEC, 60)
+                val durationSec = intent?.getIntExtra(EXTRA_DURATION_SEC, 60) ?: 60
                 startTimerMode(durationSec)
             }
             ACTION_START_BATTERY -> {
                 startBatteryMode()
             }
             ACTION_START_STROBE -> {
-                val hz = intent.getIntExtra(EXTRA_STROBE_HZ, 10)
+                val hz = intent?.getIntExtra(EXTRA_STROBE_HZ, 10) ?: 10
                 startStrobeMode(hz)
             }
             ACTION_START_SOFTLIGHT -> {
-                val brightness = intent.getIntExtra(EXTRA_BRIGHTNESS, 200)
+                val brightness = intent?.getIntExtra(EXTRA_BRIGHTNESS, 200) ?: 200
                 startSoftlightMode(brightness)
             }
             ACTION_STOP -> {

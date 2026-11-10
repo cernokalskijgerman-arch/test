@@ -29,6 +29,12 @@ enum class NothingDevice(
     )
 }
 
+data class GlyphChannel(
+    val id: Int,
+    val zoneName: String,
+    val segmentIndex: Int
+)
+
 /**
  * Layout mapping for Nothing Phone (3a Pro / 3) circular camera module.
  */

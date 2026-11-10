@@ -72,7 +72,8 @@ fun Modifier.liquidGlass(
     shape: Shape = RoundedCornerShape(22.dp),
     elevation: Dp = 10.dp,
     borderWidth: Dp = 1.2.dp,
-    isActive: Boolean = false
+    isActive: Boolean = false,
+    isBoosted: Boolean = false
 ): Modifier {
     val glassBorderBrush = if (isActive) {
         Brush.verticalGradient(
