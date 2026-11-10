@@ -1,14 +1,14 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { GlyphColors } from '../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LiquidGlassCard({
   children,
   style,
   onPress,
   isActive = false,
-  intensity = 60,
+  intensity = 50,
 }) {
   const CardContainer = onPress ? TouchableOpacity : View;
 
@@ -22,39 +22,54 @@ export default function LiquidGlassCard({
         style,
       ]}
     >
+      {/* Native frosted backdrop */}
       <BlurView
         intensity={intensity}
         tint="dark"
-        style={styles.blurView}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* iOS Liquid Glass specular refraction sheen */}
+      <LinearGradient
+        colors={
+          isActive
+            ? ['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.04)', 'rgba(15, 15, 22, 0.72)']
+            : ['rgba(255, 255, 255, 0.10)', 'rgba(255, 255, 255, 0.02)', 'rgba(14, 14, 18, 0.65)']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View
+        style={[
+          styles.innerContent,
+          isActive && styles.activeInner,
+        ]}
       >
-        <View
-          style={[
-            styles.innerContent,
-            isActive && styles.activeInner,
-          ]}
-        >
-          {children}
-        </View>
-      </BlurView>
+        {children}
+      </View>
     </CardContainer>
   );
 }
 
 const styles = StyleSheet.create({
   outerContainer: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopColor: 'rgba(255, 255, 255, 0.35)',
-    borderTopWidth: 1.5,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(20, 20, 25, 0.3)' : 'rgba(18, 18, 22, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderTopColor: 'rgba(255, 255, 255, 0.42)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.28)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(20, 20, 26, 0.35)' : 'rgba(16, 16, 22, 0.82)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.45,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 18,
       },
       android: {
         elevation: 6,
@@ -62,20 +77,25 @@ const styles = StyleSheet.create({
     }),
   },
   activeOuter: {
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    borderTopColor: 'rgba(255, 255, 255, 0.8)',
-    shadowColor: '#FFFFFF',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-  },
-  blurView: {
-    width: '100%',
-    height: '100%',
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderTopColor: 'rgba(255, 255, 255, 0.9)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.7)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFFFFF',
+        shadowOpacity: 0.3,
+        shadowRadius: 22,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
   },
   innerContent: {
-    padding: 16,
+    padding: 18,
   },
   activeInner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
 });
+
