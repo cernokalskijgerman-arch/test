@@ -1,0 +1,65 @@
+name: Automated GitHub Backup & Release
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+  schedule:
+    # Optional: Nightly backup at 00:00 UTC
+    - cron: '0 0 * * *'
+
+jobs:
+  backup:
+    name: Package and Backup Glyph Studio
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: expo-glyph-studio/package.json
+
+      - name: Install Dependencies
+        run: |
+          cd expo-glyph-studio
+          npm ci
+
+      - name: Verify Expo Export
+        run: |
+          cd expo-glyph-studio
+          npx expo export --no-bytecode
+
+      - name: Create Backup Archive
+        run: |
+          BACKUP_DATE=$(date +'%Y-%m-%d_%H-%M-%S')
+          echo "BACKUP_TAG=backup-${BACKUP_DATE}" >> $GITHUB_ENV
+          zip -r "glyph-studio-backup-${BACKUP_DATE}.zip" . -x "*.git*" "*/node_modules/*" "*/.expo/*" "*/build/*"
+
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_TAG }}
+          path: glyph-studio-backup-*.zip
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.BACKUP_TAG }}
+          name: "Backup ${{ env.BACKUP_TAG }}"
+          body: |
+            Automated backup snapshot of Nothing Glyph Studio.
+            - Includes React Native Expo source code, NDOT fonts, and native Android engine.
+            - Created automatically via GitHub Actions.
+          files: glyph-studio-backup-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

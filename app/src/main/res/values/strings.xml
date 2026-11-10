@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Glyph Studio</string>
+    <string name="notification_channel_name">Glyph Background Service</string>
+    <string name="notification_channel_desc">Active Glyph animations and utilities</string>
+</resources>
