@@ -1,17 +1,72 @@
-name: Automated GitHub Backup & Release
+name: Automated GitHub Backup & Android APK Release
 
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
-  schedule:
-    # Optional: Nightly backup at 00:00 UTC
-    - cron: '0 0 * * *'
 
 jobs:
+  build-apk:
+    name: Build Nothing Glyph Studio APK
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK with Gradle
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p release-apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-apk/NothingGlyphStudio-debug.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NothingGlyphStudio-debug-apk
+          path: release-apk/NothingGlyphStudio-debug.apk
+          retention-days: 30
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Nothing Glyph Studio APK (v1.0.${{ github.run_number }})"
+          body: |
+            ### 📱 Nothing Glyph Studio — APK с поддержкой физических глифов
+            
+            Этот файл APK устанавливается напрямую на ваш **Nothing Phone (3a Pro / 2a / 2 / 1)**:
+            - 💡 **Прямое управление физическими светодиодами** на задней крышке через официальный Nothing Glyph DevKit (`com.nothing.ketchum.permission.ENABLE`).
+            - 🎛️ **Секвенсор 16 шагов**, анализатор звука, утилиты (стробоскоп, фонарик) и аркада.
+            - 🔍 Полная поддержка 3 непрерывных дуг глифов вокруг блока камер Phone (3a Pro).
+            
+            #### 📥 Как установить:
+            1. Скачайте файл **`NothingGlyphStudio-debug.apk`** ниже на ваш смартфон.
+            2. Откройте скачанный файл и подтвердите установку («Разрешить установку из этого источника»).
+            3. Запустите приложение и управляйте реальными глифами на спинке телефона!
+          files: release-apk/NothingGlyphStudio-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   backup:
     name: Package and Backup Glyph Studio
     runs-on: ubuntu-latest
+    needs: build-apk
 
     permissions:
       contents: write
@@ -49,17 +104,3 @@ jobs:
           name: ${{ env.BACKUP_TAG }}
           path: glyph-studio-backup-*.zip
           retention-days: 30
-
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.BACKUP_TAG }}
-          name: "Backup ${{ env.BACKUP_TAG }}"
-          body: |
-            Automated backup snapshot of Nothing Glyph Studio.
-            - Includes React Native Expo source code, NDOT fonts, and native Android engine.
-            - Created automatically via GitHub Actions.
-          files: glyph-studio-backup-*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

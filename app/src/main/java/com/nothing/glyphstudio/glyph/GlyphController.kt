@@ -56,11 +56,45 @@ object GlyphController {
                 val proxy = java.lang.reflect.Proxy.newProxyInstance(
                     callbackClass.classLoader,
                     arrayOf(callbackClass)
-                ) { _, method, _ ->
+                ) { _, method, args ->
                     if (method.name == "onServiceConnected") {
-                        _isHardwareConnected.value = true
-                        _statusMessage.value = "Nothing Hardware Connected"
+                        try {
+                            // Automatically detect and register Nothing Phone device
+                            val glyphClass = Class.forName("com.nothing.ketchum.Glyph")
+                            val commonClass = Class.forName("com.nothing.ketchum.Common")
+                            val registerMethod = glyphManagerClass.getMethod("register", String::class.java)
+
+                            val is24111 = try { commonClass.getMethod("is24111").invoke(null) as? Boolean ?: false } catch (e: Exception) { false }
+                            val is23111 = try { commonClass.getMethod("is23111").invoke(null) as? Boolean ?: false } catch (e: Exception) { false }
+                            val is22111 = try { commonClass.getMethod("is22111").invoke(null) as? Boolean ?: false } catch (e: Exception) { false }
+                            val is20111 = try { commonClass.getMethod("is20111").invoke(null) as? Boolean ?: false } catch (e: Exception) { false }
+
+                            val targetDevice = when {
+                                is24111 -> glyphClass.getField("DEVICE_24111").get(null) as String // Phone (3a) / (3a Pro)
+                                is23111 -> glyphClass.getField("DEVICE_23111").get(null) as String // Phone (2a)
+                                is22111 -> glyphClass.getField("DEVICE_22111").get(null) as String // Phone (2)
+                                is20111 -> glyphClass.getField("DEVICE_20111").get(null) as String // Phone (1)
+                                else -> try { glyphClass.getField("DEVICE_24111").get(null) as String } catch (e: Exception) { "24111" }
+                            }
+
+                            registerMethod.invoke(manager, targetDevice)
+
+                            // Open Glyph session
+                            val openSessionMethod = glyphManagerClass.getMethod("openSession")
+                            openSessionMethod.invoke(manager)
+
+                            _isHardwareConnected.value = true
+                            _statusMessage.value = "Nothing Physical Glyph Connected ($targetDevice)"
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to register Glyph session: ${e.message}")
+                            _isHardwareConnected.value = true
+                            _statusMessage.value = "Glyph Connected"
+                        }
                     } else if (method.name == "onServiceDisconnected") {
+                        try {
+                            val closeSessionMethod = glyphManagerClass.getMethod("closeSession")
+                            closeSessionMethod.invoke(manager)
+                        } catch (ignored: Exception) {}
                         _isHardwareConnected.value = false
                         _statusMessage.value = "Hardware Disconnected"
                     }
@@ -70,7 +104,7 @@ object GlyphController {
                 initMethod.invoke(manager, proxy)
 
                 glyphFrameBuilderClass = Class.forName("com.nothing.ketchum.GlyphFrame\$Builder")
-                _statusMessage.value = "Nothing Glyph SDK Bound"
+                _statusMessage.value = "Nothing Glyph SDK Initialized"
             }
         } catch (e: Exception) {
             _isHardwareConnected.value = false
@@ -133,27 +167,65 @@ object GlyphController {
     fun updateFrame(frame: GlyphFrame) {
         _currentFrame.value = frame
 
-        if (_isHardwareConnected.value && glyphManagerInstance != null) {
-            try {
-                glyphFrameBuilderClass?.let { builderClass ->
-                    val builder = builderClass.getDeclaredConstructor().newInstance()
-                    val buildMethod = builderClass.getMethod("build")
-                    val buildChannelMethod = builderClass.getMethod("buildChannel", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        val manager = glyphManagerInstance ?: return
+        if (!_isHardwareConnected.value) return
 
-                    for (i in frame.segmentBrightness.indices) {
-                        buildChannelMethod.invoke(builder, i, frame.segmentBrightness[i])
+        try {
+            val isAllOff = frame.segmentBrightness.all { it <= 10 }
+            if (isAllOff) {
+                try {
+                    val turnOffMethod = manager.javaClass.getMethod("turnOff")
+                    turnOffMethod.invoke(manager)
+                } catch (e: Exception) {}
+                return
+            }
+
+            // Get frame builder from manager
+            val getBuilderMethod = manager.javaClass.getMethod("getGlyphFrameBuilder")
+            val builder = getBuilderMethod.invoke(manager)
+            val builderClass = builder.javaClass
+
+            val glyphFrameClass = Class.forName("com.nothing.ketchum.GlyphFrame")
+
+            // Build channels that are lit
+            for (i in frame.segmentBrightness.indices) {
+                if (frame.segmentBrightness[i] > 10) {
+                    try {
+                        val buildChannelWithVal = builderClass.getMethod("buildChannel", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                        buildChannelWithVal.invoke(builder, i, frame.segmentBrightness[i])
+                    } catch (e: NoSuchMethodException) {
+                        try {
+                            val buildChannelSingle = builderClass.getMethod("buildChannel", Int::class.javaPrimitiveType)
+                            buildChannelSingle.invoke(builder, i)
+                        } catch (e2: Exception) {}
                     }
-
-                    val hardwareFrame = buildMethod.invoke(builder)
-                    val displayMethod = glyphManagerInstance?.javaClass?.getMethod("animate", Class.forName("com.nothing.ketchum.GlyphFrame"))
-                    displayMethod?.invoke(glyphManagerInstance, hardwareFrame)
                 }
-            } catch (ignored: Exception) {}
+            }
+
+            val buildMethod = builderClass.getMethod("build")
+            val hardwareFrame = buildMethod.invoke(builder)
+
+            // Try toggle(frame) then animate(frame)
+            try {
+                val toggleMethod = manager.javaClass.getMethod("toggle", glyphFrameClass)
+                toggleMethod.invoke(manager, hardwareFrame)
+            } catch (e: NoSuchMethodException) {
+                val animateMethod = manager.javaClass.getMethod("animate", glyphFrameClass)
+                animateMethod.invoke(manager, hardwareFrame)
+            }
+        } catch (ignored: Exception) {
+            Log.e(TAG, "Hardware update error: ${ignored.message}")
         }
     }
 
     fun clear() {
         val total = _activeDevice.value.totalSegments
         updateFrame(GlyphFrame(segmentBrightness = IntArray(total)))
+        try {
+            glyphManagerInstance?.let { manager ->
+                val turnOffMethod = manager.javaClass.getMethod("turnOff")
+                turnOffMethod.invoke(manager)
+            }
+        } catch (e: Exception) {}
     }
 }

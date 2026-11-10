@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissions for Glyph hardware, Audio Visualizer, Background Service & Haptics -->
+    <!-- Official Nothing OS Glyph Hardware Permissions -->
+    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
+    <uses-permission android:name="com.nothing.glyph.permission.GLYPH" />
+
+    <!-- Permissions for Audio Visualizer, Background Service & Haptics -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -22,6 +26,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GlyphStudio"
         tools:targetApi="35">
+
+        <!-- Nothing Developer Key (use 'test' for development / debug builds) -->
+        <meta-data android:name="NothingKey" android:value="test" />
 
         <activity
             android:name=".MainActivity"
