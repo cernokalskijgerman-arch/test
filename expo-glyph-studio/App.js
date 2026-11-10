@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -65,6 +66,30 @@ export default function App() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setCurrentTab(3);
   };
+
+  // Horizontal swipe between tabs
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 35 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -50) {
+          setCurrentTab((curr) => {
+            const next = Math.min(curr + 1, TABS.length - 1);
+            if (next !== curr) Haptics.selectionAsync().catch(() => {});
+            return next;
+          });
+        } else if (gestureState.dx > 50) {
+          setCurrentTab((curr) => {
+            const next = Math.max(curr - 1, 0);
+            if (next !== curr) Haptics.selectionAsync().catch(() => {});
+            return next;
+          });
+        }
+      },
+    })
+  ).current;
 
   if (!fontsLoaded) {
     return (
@@ -145,8 +170,8 @@ export default function App() {
         })}
       </View>
 
-      {/* Active Screen View */}
-      <View style={styles.screenContainer}>
+      {/* Active Screen View with Swipe Gestures */}
+      <View style={styles.screenContainer} {...panResponder.panHandlers}>
         {currentTab === 0 && (
           <DashboardScreen
             brightness={brightness}
