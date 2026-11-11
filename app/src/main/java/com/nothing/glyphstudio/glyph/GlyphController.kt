@@ -266,6 +266,20 @@ object GlyphController {
         init(context)
     }
 
+    /**
+     * Scales standard 8-bit UI brightness (0..255) to Nothing Ketchum hardware 12-bit channel brightness (0..4095).
+     * In Nothing Ketchum SDK:
+     * - DEFAULT_MAX_LIGHT = 4096 / MAX_BRIGHTNESS = 4095
+     * - DEFAULT_LIGHT = 4000
+     * Raw 0..255 was lighting the LEDs at only ~6% power ("в пол силы").
+     * Scaling ensures 255 drives full 4095 brightness on physical hardware.
+     */
+    fun toHardwareBrightness(brightness: Int): Int {
+        if (brightness <= 0) return 0
+        if (brightness >= 255) return 4095
+        return (brightness * 4095 + 127) / 255
+    }
+
     fun updateFrame(frame: GlyphFrame) {
         _currentFrame.value = frame
 
@@ -309,7 +323,8 @@ object GlyphController {
             for (i in frame.segmentBrightness.indices) {
                 if (i < maxChannels) {
                     try {
-                        builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
+                        val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
+                        builder.buildChannel(i, hwLight)
                     } catch (e: Throwable) {
                         log("WARN", "buildChannel($i) failed: ${e.message}")
                     }
@@ -419,9 +434,9 @@ object GlyphController {
     fun getZoneChannels(device: NothingDevice, zoneIndex: Int): IntArray {
         return when (device) {
             NothingDevice.PHONE_3A_PRO -> when (zoneIndex) {
-                0 -> (20..30).toList().toIntArray() // Top-Left Arc (11 LEDs)
-                1 -> (31..35).toList().toIntArray() // Bottom-Left Arc (5 LEDs)
-                2 -> (0..19).toList().toIntArray()  // Right Arc (20 LEDs)
+                0 -> Phone3aProLayout.ZONE_TOP_LEFT_CHANNELS.toList().toIntArray()     // Дуга 1: Верх-Лево (20 LEDs, #0..19)
+                1 -> Phone3aProLayout.ZONE_BOTTOM_LEFT_CHANNELS.toList().toIntArray()  // Дуга 2: Низ-Лево (5 LEDs, #31..35)
+                2 -> Phone3aProLayout.ZONE_RIGHT_CHANNELS.toList().toIntArray()        // Дуга 3: Справа (11 LEDs, #20..30)
                 else -> intArrayOf()
             }
             NothingDevice.PHONE_2A -> when (zoneIndex) {
@@ -448,9 +463,9 @@ object GlyphController {
     fun getZoneName(device: NothingDevice, zoneIndex: Int): String {
         return when (device) {
             NothingDevice.PHONE_3A_PRO -> when (zoneIndex) {
-                0 -> "Дуга 1: Верх-Лево (11 LEDs, #20..30)"
+                0 -> "Дуга 1: Верх-Лево (20 LEDs, #0..19)"
                 1 -> "Дуга 2: Низ-Лево (5 LEDs, #31..35)"
-                2 -> "Дуга 3: Справа (20 LEDs, #0..19)"
+                2 -> "Дуга 3: Справа (11 LEDs, #20..30)"
                 else -> "Зона $zoneIndex"
             }
             NothingDevice.PHONE_2A -> when (zoneIndex) {
@@ -477,9 +492,9 @@ object GlyphController {
     fun getChannelZoneDescription(device: NothingDevice, channel: Int): String {
         return when (device) {
             NothingDevice.PHONE_3A_PRO -> when (channel) {
-                in 20..30 -> "Дуга 1 (Верх-Лево) #${channel - 20}"
+                in 0..19 -> "Дуга 1 (Верх-Лево) #$channel"
                 in 31..35 -> "Дуга 2 (Низ-Лево) #${channel - 31}"
-                in 0..19 -> "Дуга 3 (Справа) #$channel"
+                in 20..30 -> "Дуга 3 (Справа) #${channel - 20}"
                 else -> "Канал #$channel"
             }
             NothingDevice.PHONE_2A -> when (channel) {
@@ -503,11 +518,7 @@ object GlyphController {
 
     fun getCircularSequence(device: NothingDevice): IntArray {
         return when (device) {
-            NothingDevice.PHONE_3A_PRO -> intArrayOf(
-                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, // Top-Left Arc
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, // Right Arc
-                31, 32, 33, 34, 35 // Bottom-Left Arc
-            )
+            NothingDevice.PHONE_3A_PRO -> (0 until 36).toList().toIntArray()
             NothingDevice.PHONE_2A -> intArrayOf(
                 25, // Top-Left
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, // Right Arc
@@ -529,7 +540,8 @@ object GlyphController {
         try {
             val builder = manager.getGlyphFrameBuilder()
             for (i in frame.segmentBrightness.indices) {
-                builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
+                val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
+                builder.buildChannel(i, hwLight)
             }
             try {
                 builder.buildPeriod(durationMs)

@@ -232,18 +232,18 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
     val trackWidth = 7.dp.toPx()
 
     // Base Curved Tracks (matching the thick grey lines in the user's sketch)
-    // Arc 1: Top-Left (198° to 239°, sweep 41°)
+    // Arc 1: Top-Left (192° to 244°, sweep 52°, holding 20 micro-LEDs, channels 0..19)
     drawArc(
         color = trackCol,
-        startAngle = 198f,
-        sweepAngle = 41f,
+        startAngle = 192f,
+        sweepAngle = 52f,
         useCenter = false,
         topLeft = Offset(cx - glyphR, cy - glyphR),
         size = Size(glyphR * 2, glyphR * 2),
         style = Stroke(width = trackWidth, cap = StrokeCap.Round)
     )
 
-    // Arc 2: Bottom-Left (134° to 155°, sweep 21°)
+    // Arc 2: Bottom-Left (134° to 155°, sweep 21°, holding 5 micro-LEDs, channels 31..35)
     drawArc(
         color = trackCol,
         startAngle = 134f,
@@ -254,7 +254,7 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
         style = Stroke(width = trackWidth, cap = StrokeCap.Round)
     )
 
-    // Arc 3: Right (-16° to 32°, sweep 48°)
+    // Arc 3: Right (-16° to 32°, sweep 48°, holding 11 micro-LEDs, channels 20..30)
     drawArc(
         color = trackCol,
         startAngle = -16f,
@@ -266,58 +266,58 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
     )
 
     // -------------------------------------------------------------
-    // ARC 1: TOP-LEFT ARC (11 micro-LEDs) - Ketchum Zone A: channels 20..30
-    // Runs along upper-left quadrant from angle 198° to 239°
+    // ARC 1: TOP-LEFT ARC (20 micro-LEDs) - channels 0..19 (Дуга 1)
+    // Runs along upper-left quadrant from angle 195° to 241°
     // -------------------------------------------------------------
     val arc1Count = Phone3aProLayout.COUNT_TOP_LEFT
-    val arc1Start = 198f
-    val arc1End = 239f
+    val arc1Start = 195f
+    val arc1End = 241f
     val arc1Step = (arc1End - arc1Start) / (arc1Count - 1)
 
     for (i in 0 until arc1Count) {
+        val channelIdx = i // 0..19
         val angleDeg = arc1Start + i * arc1Step
         val rad = angleDeg * (PI / 180.0)
         val ledCenter = Offset(
             (cx + glyphR * cos(rad)).toFloat(),
             (cy + glyphR * sin(rad)).toFloat()
         )
-        val channelIdx = 20 + i
         val b = if (channelIdx < brightness.size) brightness[channelIdx] else 0
-        drawDiscreteLedDot(ledCenter, b, radius = 4.2.dp.toPx())
+        drawDiscreteLedDot(ledCenter, b, radius = 4.0.dp.toPx())
     }
 
     // -------------------------------------------------------------
-    // ARC 2: BOTTOM-LEFT ARC (5 micro-LEDs) - Ketchum Zone B: channels 31..35
-    // Runs along bottom-left quadrant from angle 134° to 155°
+    // ARC 2: BOTTOM-LEFT ARC (5 micro-LEDs) - channels 31..35 (Дуга 2)
+    // Runs along bottom-left quadrant from angle 136° to 153°
     // -------------------------------------------------------------
     val arc2Count = Phone3aProLayout.COUNT_BOTTOM_LEFT
-    val arc2Start = 134f
-    val arc2End = 155f
+    val arc2Start = 136f
+    val arc2End = 153f
     val arc2Step = (arc2End - arc2Start) / (arc2Count - 1)
 
     for (i in 0 until arc2Count) {
+        val channelIdx = 31 + i // 31..35
         val angleDeg = arc2Start + i * arc2Step
         val rad = angleDeg * (PI / 180.0)
         val ledCenter = Offset(
             (cx + glyphR * cos(rad)).toFloat(),
             (cy + glyphR * sin(rad)).toFloat()
         )
-        val channelIdx = 31 + i
         val b = if (channelIdx < brightness.size) brightness[channelIdx] else 0
         drawDiscreteLedDot(ledCenter, b, radius = 4.2.dp.toPx())
     }
 
     // -------------------------------------------------------------
-    // ARC 3: RIGHT VERTICAL ARC (20 micro-LEDs) - Ketchum Zone C: channels 0..19
-    // Runs vertically along entire right side from angle -16° (344°) to 32°
+    // ARC 3: RIGHT VERTICAL ARC (11 micro-LEDs) - channels 20..30 (Дуга 3)
+    // Runs vertically along right side from angle -14° to 30°
     // -------------------------------------------------------------
     val arc3Count = Phone3aProLayout.COUNT_RIGHT
-    val arc3Start = -16f
-    val arc3End = 32f
+    val arc3Start = -14f
+    val arc3End = 30f
     val arc3Step = (arc3End - arc3Start) / (arc3Count - 1)
 
     for (i in 0 until arc3Count) {
-        val channelIdx = i
+        val channelIdx = 20 + i // 20..30
         val angleDeg = arc3Start + i * arc3Step
         val rad = angleDeg * (PI / 180.0)
         val ledCenter = Offset(

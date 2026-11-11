@@ -18,7 +18,7 @@ enum class NothingDevice(
         displayName = "Nothing Phone (3a Pro / 3)",
         zoneCount = 3,
         totalSegments = 36,
-        description = "3 curved arcs around camera: Top-Left (11 LEDs), Bottom-Left (5 LEDs), Right (20 LEDs)"
+        description = "3 curved arcs around camera: Top-Left (20 LEDs), Bottom-Left (5 LEDs), Right (11 LEDs)"
     ),
     PHONE_2A(
         deviceCode = Glyph.DEVICE_23111, // "A142" (Nothing Phone 2a)
@@ -51,32 +51,37 @@ data class GlyphChannel(
 
 /**
  * Layout mapping for Nothing Phone (3a Pro / 3, DEVICE_24111) circular camera module.
- * Direct Ketchum mapping:
- * - Zone C (Right Arc): channels 0..19 (20 LEDs)
- * - Zone A (Top-Left Arc): channels 20..30 (11 LEDs)
- * - Zone B (Bottom-Left Arc): channels 31..35 (5 LEDs)
+ * Physical hardware and Ketchum mapping:
+ * - Zone C (Дуга 1: Верх-Лево): channels 0..19 (20 LEDs)
+ * - Zone A (Дуга 3: Справа): channels 20..30 (11 LEDs)
+ * - Zone B (Дуга 2: Низ-Лево): channels 31..35 (5 LEDs)
  */
 object Phone3aProLayout {
-    const val COUNT_RIGHT = 20
-    const val COUNT_TOP_LEFT = 11
+    const val COUNT_TOP_LEFT = 20
     const val COUNT_BOTTOM_LEFT = 5
+    const val COUNT_RIGHT = 11
     const val TOTAL_LEDS = 36
 
-    val ZONE_A_CHANNELS = 20..30 // Top-Left Arc
-    val ZONE_B_CHANNELS = 31..35 // Bottom-Left Arc
-    val ZONE_C_CHANNELS = 0..19  // Right Arc
+    val ZONE_TOP_LEFT_CHANNELS = 0..19     // Дуга 1: Верх-Лево (20 LEDs)
+    val ZONE_BOTTOM_LEFT_CHANNELS = 31..35 // Дуга 2: Низ-Лево (5 LEDs)
+    val ZONE_RIGHT_CHANNELS = 20..30       // Дуга 3: Справа (11 LEDs)
+
+    // Ketchum zone name aliases
+    val ZONE_A_CHANNELS = ZONE_RIGHT_CHANNELS
+    val ZONE_B_CHANNELS = ZONE_BOTTOM_LEFT_CHANNELS
+    val ZONE_C_CHANNELS = ZONE_TOP_LEFT_CHANNELS
 
     val CHANNELS: List<GlyphChannel> = buildList {
-        for (i in 0 until COUNT_RIGHT) {
-            add(GlyphChannel(id = i, zoneName = "Правая дуга #$i (Zone C)", segmentIndex = i))
-        }
         for (i in 0 until COUNT_TOP_LEFT) {
+            add(GlyphChannel(id = i, zoneName = "Верх-Лево #$i (Дуга 1)", segmentIndex = i))
+        }
+        for (i in 0 until COUNT_RIGHT) {
             val idx = 20 + i
-            add(GlyphChannel(id = idx, zoneName = "Верх-Лево #$i (Zone A)", segmentIndex = idx))
+            add(GlyphChannel(id = idx, zoneName = "Справа #$i (Дуга 3)", segmentIndex = idx))
         }
         for (i in 0 until COUNT_BOTTOM_LEFT) {
             val idx = 31 + i
-            add(GlyphChannel(id = idx, zoneName = "Низ-Лево #$i (Zone B)", segmentIndex = idx))
+            add(GlyphChannel(id = idx, zoneName = "Низ-Лево #$i (Дуга 2)", segmentIndex = idx))
         }
     }
 }
