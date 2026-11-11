@@ -73,42 +73,32 @@ export default function LiquidGlassCard({
         style,
       ]}
     >
-      {/* 1. Frosted Blur Background */}
-      {Platform.OS === 'ios' ? (
-        <BlurView
-          intensity={intensity}
-          tint="dark"
-          style={[StyleSheet.absoluteFill, { borderRadius }]}
-        />
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.androidBlurFallback,
-            { borderRadius },
-          ]}
-        />
-      )}
+      {/* 1. Frosted Blur Background (Hardware accelerated on iOS and Android) */}
+      <BlurView
+        intensity={Platform.OS === 'ios' ? intensity : Math.min(intensity, 55)}
+        tint="dark"
+        style={[StyleSheet.absoluteFill, { borderRadius }]}
+      />
 
       {/* 2. Deep optical glass refraction base gradient */}
       <LinearGradient
         colors={
           isActive
-            ? ['rgba(255, 255, 255, 0.16)', 'rgba(25, 28, 40, 0.40)', 'rgba(10, 12, 18, 0.82)']
-            : ['rgba(255, 255, 255, 0.08)', 'rgba(20, 22, 32, 0.35)', 'rgba(8, 10, 14, 0.78)']
+            ? ['rgba(255, 255, 255, 0.16)', 'rgba(25, 28, 42, 0.38)', 'rgba(10, 12, 18, 0.72)']
+            : ['rgba(255, 255, 255, 0.08)', 'rgba(20, 22, 34, 0.30)', 'rgba(8, 10, 16, 0.65)']
         }
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.9, y: 1 }}
         style={[StyleSheet.absoluteFill, { borderRadius }]}
       />
 
-      {/* 3. Diagonal specular light reflection sheen */}
+      {/* 3. Diagonal specular light reflection sheen (Prism caustic refraction) */}
       <LinearGradient
         colors={[
-          'rgba(255, 255, 255, 0.14)',
+          'rgba(255, 255, 255, 0.15)',
           'rgba(255, 255, 255, 0.04)',
           'transparent',
-          'rgba(255, 255, 255, 0.02)',
+          'rgba(255, 255, 255, 0.03)',
         ]}
         locations={[0, 0.28, 0.65, 1]}
         start={{ x: 0, y: 0 }}
@@ -125,13 +115,13 @@ export default function LiquidGlassCard({
             {
               borderRadius,
               opacity: sheenAnim,
-              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              backgroundColor: 'rgba(255, 255, 255, 0.07)',
             },
           ]}
         />
       )}
 
-      {/* 5. Top Specular Glass Edge Highlight (Simulating 1px chamfered prism refraction) */}
+      {/* 5. Top Specular Glass Edge Highlight (Simulating 1.5px chamfered prism refraction) */}
       <View
         pointerEvents="none"
         style={[
@@ -144,15 +134,26 @@ export default function LiquidGlassCard({
       >
         <LinearGradient
           colors={[
-            'rgba(255, 255, 255, 0.85)',
-            'rgba(255, 255, 255, 0.40)',
-            'rgba(255, 255, 255, 0.05)',
+            'rgba(255, 255, 255, 0.90)',
+            'rgba(255, 255, 255, 0.45)',
+            'rgba(255, 255, 255, 0.08)',
           ]}
           start={{ x: 0.05, y: 0 }}
           end={{ x: 0.95, y: 0 }}
           style={styles.topRimGradient}
         />
       </View>
+
+      {/* 6. Active Halo Ambient Rim */}
+      {isActive && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.activeHaloRim,
+            { borderRadius },
+          ]}
+        />
+      )}
 
       {/* Card Content Body */}
       <View style={[styles.innerContent, isPill && styles.pillInner]}>
@@ -185,7 +186,7 @@ const styles = StyleSheet.create({
     borderLeftColor: GlyphColors.glassSpecularLeft,
     borderRightColor: GlyphColors.glassSpecularRight,
     borderBottomColor: GlyphColors.glassSpecularBottom,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(18, 20, 28, 0.35)' : 'rgba(16, 18, 24, 0.85)',
+    backgroundColor: 'rgba(16, 18, 26, 0.45)',
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
@@ -214,9 +215,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  androidBlurFallback: {
-    backgroundColor: 'rgba(18, 20, 28, 0.88)',
-  },
   topRimHighlight: {
     position: 'absolute',
     top: 0,
@@ -227,6 +225,11 @@ const styles = StyleSheet.create({
   },
   topRimGradient: {
     flex: 1,
+  },
+  activeHaloRim: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
   innerContent: {
     padding: 16,

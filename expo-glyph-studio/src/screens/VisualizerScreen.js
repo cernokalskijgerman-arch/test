@@ -94,6 +94,9 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      if (onBrightnessChange) {
+        onBrightnessChange([0, 0, 0]);
+      }
     };
   }, [isActive]);
 

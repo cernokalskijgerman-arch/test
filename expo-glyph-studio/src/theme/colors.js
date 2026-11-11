@@ -27,11 +27,13 @@ export const GlyphColors = {
 
   // iOS-style Liquid Glass Borders & Surfaces
   glassBorder: 'rgba(255, 255, 255, 0.16)',
-  glassSpecularTop: 'rgba(255, 255, 255, 0.65)',
-  glassSpecularLeft: 'rgba(255, 255, 255, 0.35)',
+  glassSpecularTop: 'rgba(255, 255, 255, 0.75)',
+  glassSpecularLeft: 'rgba(255, 255, 255, 0.40)',
   glassSpecularBottom: 'rgba(255, 255, 255, 0.08)',
-  glassSpecularRight: 'rgba(255, 255, 255, 0.12)',
-  glassBackground: 'rgba(20, 22, 30, 0.55)',
-  glassActiveBorder: 'rgba(255, 255, 255, 0.65)',
-  glassRimHighlight: 'rgba(255, 255, 255, 0.85)',
+  glassSpecularRight: 'rgba(255, 255, 255, 0.14)',
+  glassBackground: 'rgba(16, 18, 26, 0.45)',
+  glassActiveBorder: 'rgba(255, 255, 255, 0.70)',
+  glassRimHighlight: 'rgba(255, 255, 255, 0.90)',
+  glassCaustic: 'rgba(255, 255, 255, 0.06)',
+  specularHalo: 'rgba(255, 255, 255, 0.20)',
 };

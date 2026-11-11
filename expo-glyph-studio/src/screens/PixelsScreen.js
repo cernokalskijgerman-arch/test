@@ -32,8 +32,12 @@ export default function PixelsScreen({
   const handleStepPixel = (direction) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const total = 36;
-    const current = activePixel !== null ? activePixel : 0;
-    const next = (current + direction + total) % total;
+    let next;
+    if (activePixel === null) {
+      next = direction > 0 ? 0 : total - 1;
+    } else {
+      next = (activePixel + direction + total) % total;
+    }
     onActivePixelChange && onActivePixelChange(next);
   };
 

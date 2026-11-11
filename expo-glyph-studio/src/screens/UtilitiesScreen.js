@@ -262,6 +262,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
       if (reflexTimerRef.current) clearTimeout(reflexTimerRef.current);
+      if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
     };
   }, []);
 

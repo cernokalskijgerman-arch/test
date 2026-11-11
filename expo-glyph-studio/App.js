@@ -52,10 +52,14 @@ export default function App() {
   const [autoWalkMode, setAutoWalkMode] = useState('forward'); // 'forward' | 'reverse' | 'pingpong' | 'random'
   const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(false);
 
-  // Screen transition animation
+  // Screen transition animations
   const screenFadeAnim = useRef(new Animated.Value(1)).current;
+  const screenTranslateX = useRef(new Animated.Value(0)).current;
 
   // Refs for real-time reactivity without re-render loop tearing
+  const currentTabRef = useRef(currentTab);
+  currentTabRef.current = currentTab;
+
   const autoWalkSpeedRef = useRef(autoWalkSpeed);
   autoWalkSpeedRef.current = autoWalkSpeed;
 
@@ -85,9 +89,8 @@ export default function App() {
 
       // Update master brightness to match max of active arcs
       const maxB = Math.max(...next);
-      if (maxB !== masterBrightnessRef.current) {
-        setMasterBrightness(maxB);
-      }
+      setMasterBrightness(maxB);
+      masterBrightnessRef.current = maxB;
       return next;
     });
   }, []);
@@ -99,6 +102,7 @@ export default function App() {
       next[arcIndex] = newVal;
       const maxB = Math.max(...next);
       setMasterBrightness(maxB);
+      masterBrightnessRef.current = maxB;
       return next;
     });
   }, []);
@@ -106,6 +110,7 @@ export default function App() {
   // Master brightness handler: instant 0-cutoff, instant revival > 0, never freezes
   const handleMasterBrightnessChange = useCallback((newVal) => {
     setMasterBrightness(newVal);
+    masterBrightnessRef.current = newVal;
     if (newVal <= 0) {
       setBrightness([0, 0, 0]);
       setActivePixel(null);
@@ -113,18 +118,27 @@ export default function App() {
         setIsAutoWalk(false);
       }
     } else {
-      setBrightness([newVal, newVal, newVal]);
+      setBrightness((prev) => {
+        const isUniform = prev.every((b) => b === prev[0]);
+        if (isUniform) {
+          return [newVal, newVal, newVal];
+        }
+        const maxPrev = Math.max(...prev, 1);
+        return prev.map((b) => Math.round((b / maxPrev) * newVal));
+      });
     }
   }, []);
 
   const handleAllOn = useCallback((val = 255) => {
     const target = val > 0 ? val : (masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255);
     setMasterBrightness(target);
+    masterBrightnessRef.current = target;
     setBrightness([target, target, target]);
   }, []);
 
   const handleAllOff = useCallback(() => {
     setMasterBrightness(0);
+    masterBrightnessRef.current = 0;
     setBrightness([0, 0, 0]);
     setActivePixel(null);
     if (isAutoWalkRef.current) {
@@ -135,6 +149,7 @@ export default function App() {
   // Step-by-step pixel navigation
   const handleActivePixelChange = useCallback((pixelId) => {
     setActivePixel(pixelId);
+    activePixelRef.current = pixelId;
     if (pixelId === null) {
       const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
       setBrightness([b, b, b]);
@@ -147,28 +162,6 @@ export default function App() {
       const nextB = [0, 0, 0];
       nextB[arc] = b;
       setBrightness(nextB);
-    }
-  }, []);
-
-  // Auto-walk toggle
-  const handleToggleAutoWalk = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setIsAutoWalk((prev) => !prev);
-  }, []);
-
-  // Instant auto-walk speed adjustment
-  const handleAutoWalkSpeedChange = useCallback((newSpeed) => {
-    setAutoWalkSpeed(newSpeed);
-    autoWalkSpeedRef.current = newSpeed;
-
-    // If speed was made significantly faster while waiting, accelerate immediately
-    if (isAutoWalkRef.current && stepTimerRef.current) {
-      const elapsed = Date.now() - stepStartTimeRef.current;
-      if (elapsed >= newSpeed) {
-        clearTimeout(stepTimerRef.current);
-        // Step immediately
-        triggerWalkStep();
-      }
     }
   }, []);
 
@@ -209,6 +202,32 @@ export default function App() {
     stepTimerRef.current = setTimeout(triggerWalkStep, speed);
   }, []);
 
+  // Auto-walk toggle
+  const handleToggleAutoWalk = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setIsAutoWalk((prev) => !prev);
+  }, []);
+
+  // Instant auto-walk speed adjustment with dynamic timer rescheduling
+  const handleAutoWalkSpeedChange = useCallback((newSpeed) => {
+    setAutoWalkSpeed(newSpeed);
+    autoWalkSpeedRef.current = newSpeed;
+
+    // Real-time recalculation of active step timer
+    if (isAutoWalkRef.current && stepTimerRef.current) {
+      const elapsed = Date.now() - stepStartTimeRef.current;
+      const remaining = newSpeed - elapsed;
+      clearTimeout(stepTimerRef.current);
+      if (remaining <= 0) {
+        // Interval already elapsed -> step immediately
+        triggerWalkStep();
+      } else {
+        // Reschedule pending step for remaining adjusted interval
+        stepTimerRef.current = setTimeout(triggerWalkStep, remaining);
+      }
+    }
+  }, [triggerWalkStep]);
+
   // Real-time animation loop lifecycle
   useEffect(() => {
     if (!isAutoWalk) {
@@ -229,43 +248,54 @@ export default function App() {
     };
   }, [isAutoWalk, triggerWalkStep]);
 
-  // Tab switch with smooth transition animation
+  // Tab switch with smooth directional slide and opacity transition
   const handleTabSwitch = useCallback((tabIndex) => {
-    if (tabIndex === currentTab) return;
+    const cur = currentTabRef.current;
+    if (tabIndex === cur) return;
     Haptics.selectionAsync().catch(() => {});
 
-    Animated.sequence([
-      Animated.timing(screenFadeAnim, {
-        toValue: 0.35,
-        duration: 80,
+    const direction = tabIndex > cur ? 1 : -1;
+    screenTranslateX.setValue(direction * 35);
+    screenFadeAnim.setValue(0.5);
+
+    setCurrentTab(tabIndex);
+    currentTabRef.current = tabIndex;
+
+    Animated.parallel([
+      Animated.spring(screenTranslateX, {
+        toValue: 0,
+        tension: 130,
+        friction: 13,
         useNativeDriver: true,
       }),
       Animated.timing(screenFadeAnim, {
         toValue: 1,
-        duration: 140,
+        duration: 160,
         useNativeDriver: true,
       }),
     ]).start();
+  }, [screenFadeAnim, screenTranslateX]);
 
-    setCurrentTab(tabIndex);
-  }, [currentTab, screenFadeAnim]);
-
-  // Horizontal swipe between tabs
+  // Horizontal swipe between tabs (dynamic currentTabRef lookup avoids stale closure)
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 35 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8;
+        return (
+          Math.abs(gestureState.dx) > 35 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2.2
+        );
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -50) {
+        const cur = currentTabRef.current;
+        if (gestureState.dx < -45) {
           // Swipe Left -> Next Tab
-          if (currentTab < TABS.length - 1) {
-            handleTabSwitch(currentTab + 1);
+          if (cur < TABS.length - 1) {
+            handleTabSwitch(cur + 1);
           }
-        } else if (gestureState.dx > 50) {
+        } else if (gestureState.dx > 45) {
           // Swipe Right -> Prev Tab
-          if (currentTab > 0) {
-            handleTabSwitch(currentTab - 1);
+          if (cur > 0) {
+            handleTabSwitch(cur - 1);
           }
         }
       },
@@ -381,7 +411,7 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* iOS Liquid Glass Navigation Tab Bar */}
+      {/* iOS Liquid Glass Navigation Tab Bar with Sliding Liquid Glass Pill */}
       <LiquidGlassTabBar
         tabs={TABS}
         currentTab={currentTab}
@@ -389,9 +419,15 @@ export default function App() {
         onOpenCategorySwitcher={() => setIsCategorySwitcherOpen(true)}
       />
 
-      {/* Active Screen View with Swipe Gestures & Smooth Fade Animation */}
+      {/* Active Screen View with Swipe Gestures & Smooth Spring Transition Animation */}
       <Animated.View
-        style={[styles.screenContainer, { opacity: screenFadeAnim }]}
+        style={[
+          styles.screenContainer,
+          {
+            opacity: screenFadeAnim,
+            transform: [{ translateX: screenTranslateX }],
+          },
+        ]}
         {...panResponder.panHandlers}
       >
         {currentTab === 0 && (
@@ -437,7 +473,7 @@ export default function App() {
         )}
       </Animated.View>
 
-      {/* iOS Liquid Glass Category Switcher Modal */}
+      {/* iOS Liquid Glass Category Switcher Sheet Modal */}
       <CategorySwitcherModal
         visible={isCategorySwitcherOpen}
         categories={TABS}

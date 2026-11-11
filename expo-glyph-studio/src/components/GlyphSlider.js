@@ -7,6 +7,8 @@ import { GlyphColors } from '../theme/colors';
 /**
  * iOS-style Liquid Glass Slider optimized for Expo Go.
  * Zero external binary dependencies; 100% glitch-free gesture tracking.
+ * Features zero boundary hysteresis (instant reverse response from 0 and max),
+ * non-hijackable responder lock, and authentic specular glass optics.
  */
 export default function GlyphSlider({
   label,
@@ -22,7 +24,7 @@ export default function GlyphSlider({
   disabled = false,
 }) {
   const trackWidthRef = useRef(200);
-  const startValRef = useRef(value);
+  const startXRef = useRef(0);
   const lastReportedValRef = useRef(value);
   const lastHapticValRef = useRef(value);
 
@@ -50,15 +52,24 @@ export default function GlyphSlider({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return !disabled && (Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2);
       },
+      // Never yield responder to parent screen swipe or scroll views mid-drag
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
         if (disabled) return;
         const width = trackWidthRef.current || 200;
         const touchX = Math.max(0, Math.min(width, evt.nativeEvent.locationX));
-        const fraction = touchX / width;
+        const currentFraction = Math.max(0, Math.min(1, (value - min) / (max - min || 1)));
+        const currentThumbX = currentFraction * width;
+
+        // If touched near existing thumb puck (within 24px), anchor to thumb position
+        // If touched on the track to seek, seek directly to touch point
+        const initialX = Math.abs(touchX - currentThumbX) <= 24 ? currentThumbX : touchX;
+        startXRef.current = initialX;
+
+        const fraction = initialX / width;
         const rawVal = min + fraction * (max - min);
         const newVal = calculateSteppedValue(rawVal);
 
-        startValRef.current = newVal;
         lastReportedValRef.current = newVal;
         lastHapticValRef.current = newVal;
 
@@ -68,13 +79,37 @@ export default function GlyphSlider({
       onPanResponderMove: (_, gestureState) => {
         if (disabled) return;
         const width = trackWidthRef.current || 200;
-        const deltaVal = (gestureState.dx / width) * (max - min);
-        const rawVal = startValRef.current + deltaVal;
+        let currentX = startXRef.current + gestureState.dx;
+
+        // Prevent boundary hysteresis / dead zone:
+        // When finger overshoots beyond track edges, dynamically adjust startX
+        // so reverse dragging instantly responds on the very first pixel
+        if (currentX > width) {
+          startXRef.current = width - gestureState.dx;
+          currentX = width;
+        } else if (currentX < 0) {
+          startXRef.current = -gestureState.dx;
+          currentX = 0;
+        }
+
+        const fraction = Math.max(0, Math.min(1, currentX / width));
+        const rawVal = min + fraction * (max - min);
         const newVal = calculateSteppedValue(rawVal);
 
         if (newVal !== lastReportedValRef.current) {
+          const wasBoundary =
+            (newVal === min && lastReportedValRef.current !== min) ||
+            (newVal === max && lastReportedValRef.current !== max);
+
           lastReportedValRef.current = newVal;
-          triggerHapticIfThreshold(newVal);
+
+          if (wasBoundary) {
+            // Tactile bump at limit (0% or 100%)
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          } else {
+            triggerHapticIfThreshold(newVal);
+          }
+
           onValueChange && onValueChange(newVal);
         }
       },
@@ -134,7 +169,7 @@ export default function GlyphSlider({
             styles.thumb,
             {
               left: percentageStr,
-              borderColor: fraction > 0.005 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)',
+              borderColor: fraction > 0.005 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
               backgroundColor: fraction > 0.005 ? '#FFFFFF' : '#1C1C24',
             },
           ]}
@@ -191,8 +226,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.25)',
-    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderTopColor: 'rgba(255, 255, 255, 0.28)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.18)',
     borderRightColor: 'rgba(255, 255, 255, 0.08)',
     borderBottomColor: 'rgba(255, 255, 255, 0.04)',
     overflow: 'hidden',
@@ -204,7 +239,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.32)',
   },
   trackActive: {
     height: '100%',

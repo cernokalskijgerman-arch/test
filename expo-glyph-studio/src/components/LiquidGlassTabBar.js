@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +15,9 @@ import { GlyphColors } from '../theme/colors';
 
 /**
  * iOS-style Floating Liquid Glass Tab Bar.
- * Supports tap to switch, and re-tap to trigger Category Switcher mode.
+ * Features a dynamic sliding liquid glass indicator pill that glides smoothly
+ * between tabs, tap-to-switch, re-tap to trigger Category Switcher mode,
+ * and direct horizontal swipe gestures along the dock.
  */
 export default function LiquidGlassTabBar({
   tabs = [],
@@ -21,6 +25,20 @@ export default function LiquidGlassTabBar({
   onSelectTab,
   onOpenCategorySwitcher,
 }) {
+  const [barWidth, setBarWidth] = useState(0);
+  const pillAnim = useRef(new Animated.Value(currentTab)).current;
+  const currentTabRef = useRef(currentTab);
+  currentTabRef.current = currentTab;
+
+  useEffect(() => {
+    Animated.spring(pillAnim, {
+      toValue: currentTab,
+      tension: 140,
+      friction: 14,
+      useNativeDriver: false,
+    }).start();
+  }, [currentTab]);
+
   const handleTabPress = (tabIndex) => {
     if (tabIndex === currentTab) {
       // Re-tap on currently active tab -> activate Category Switcher mode!
@@ -32,19 +50,51 @@ export default function LiquidGlassTabBar({
     }
   };
 
+  // Direct swipe gesture along the tab bar dock
+  const tabPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const cur = currentTabRef.current;
+        if (gestureState.dx < -30 && cur < tabs.length - 1) {
+          handleTabPress(cur + 1);
+        } else if (gestureState.dx > 30 && cur > 0) {
+          handleTabPress(cur - 1);
+        }
+      },
+    })
+  ).current;
+
+  const tabCount = tabs.length || 1;
+  const tabWidth = barWidth > 0 ? (barWidth - 8) / tabCount : 0;
+
+  const pillLeft = tabWidth > 0
+    ? pillAnim.interpolate({
+        inputRange: tabs.map((_, i) => i),
+        outputRange: tabs.map((_, i) => 4 + i * tabWidth),
+      })
+    : 4;
+
   return (
-    <View style={styles.dockContainer}>
-      <View style={styles.glassCapsule}>
-        {/* Frosted glass background */}
-        {Platform.OS === 'ios' ? (
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.androidFallback]} />
-        )}
+    <View style={styles.dockContainer} {...tabPanResponder.panHandlers}>
+      <View
+        style={styles.glassCapsule}
+        onLayout={(e) => {
+          setBarWidth(e.nativeEvent.layout.width);
+        }}
+      >
+        {/* Frosted glass background (hardware accelerated on iOS and Android) */}
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 55 : 40}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
 
         {/* Specular gradient sheen */}
         <LinearGradient
-          colors={['rgba(255, 255, 255, 0.14)', 'rgba(20, 22, 32, 0.65)']}
+          colors={['rgba(255, 255, 255, 0.12)', 'rgba(18, 20, 30, 0.55)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -53,6 +103,34 @@ export default function LiquidGlassTabBar({
         {/* Top rim specular highlight line */}
         <View pointerEvents="none" style={styles.topRimHighlight} />
 
+        {/* Sliding Liquid Glass Indicator Pill */}
+        {tabWidth > 0 && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.slidingPill,
+              {
+                width: tabWidth,
+                left: pillLeft,
+              },
+            ]}
+          >
+            {/* Pill Specular Highlight */}
+            <LinearGradient
+              colors={[
+                'rgba(255, 255, 255, 0.28)',
+                'rgba(255, 255, 255, 0.12)',
+                'rgba(255, 255, 255, 0.05)',
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Pill top specular line */}
+            <View style={styles.pillTopRim} />
+          </Animated.View>
+        )}
+
         {/* Tab Buttons */}
         <View style={styles.buttonsRow}>
           {tabs.map((tab) => {
@@ -60,10 +138,7 @@ export default function LiquidGlassTabBar({
             return (
               <TouchableOpacity
                 key={tab.id}
-                style={[
-                  styles.tabButton,
-                  isSelected && styles.tabButtonActive,
-                ]}
+                style={styles.tabButton}
                 onPress={() => handleTabPress(tab.id)}
                 activeOpacity={0.7}
               >
@@ -89,11 +164,11 @@ export default function LiquidGlassTabBar({
 
 const styles = StyleSheet.create({
   dockContainer: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 5,
   },
   glassCapsule: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1.2,
@@ -101,7 +176,7 @@ const styles = StyleSheet.create({
     borderLeftColor: GlyphColors.glassSpecularLeft,
     borderRightColor: GlyphColors.glassSpecularRight,
     borderBottomColor: GlyphColors.glassSpecularBottom,
-    backgroundColor: Platform.OS === 'ios' ? 'rgba(18, 20, 28, 0.40)' : 'rgba(16, 18, 24, 0.88)',
+    backgroundColor: 'rgba(16, 18, 26, 0.50)',
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
@@ -114,36 +189,59 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  androidFallback: {
-    backgroundColor: 'rgba(18, 20, 28, 0.90)',
-  },
   topRimHighlight: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: 1.2,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+  },
+  slidingPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.75)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.40)',
+    borderRightColor: 'rgba(255, 255, 255, 0.25)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFFFFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  pillTopRim: {
+    position: 'absolute',
+    top: 0,
+    left: 4,
+    right: 4,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
   },
   buttonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 4,
-    gap: 4,
+    position: 'relative',
+    zIndex: 2,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
     position: 'relative',
-  },
-  tabButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
   },
   activeDot: {
     width: 4,
@@ -151,9 +249,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#FFFFFF',
     position: 'absolute',
-    top: 4,
+    top: 3,
     shadowColor: '#FFFFFF',
-    shadowRadius: 4,
+    shadowRadius: 5,
     shadowOpacity: 1,
   },
   tabText: {

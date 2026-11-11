@@ -115,6 +115,9 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      if (onBrightnessChange) {
+        onBrightnessChange([0, 0, 0]);
+      }
       return;
     }
 
@@ -140,6 +143,9 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      if (onBrightnessChange) {
+        onBrightnessChange([0, 0, 0]);
       }
     };
   }, [isPlaying, bpm]);

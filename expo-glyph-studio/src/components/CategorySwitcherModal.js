@@ -8,9 +8,9 @@ import {
   TouchableWithoutFeedback,
   Animated,
   Platform,
+  PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from './LiquidGlassCard';
 import { GlyphColors } from '../theme/colors';
@@ -23,7 +23,7 @@ export default function CategorySwitcherModal({
   onClose,
   stats = {},
 }) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const slideAnim = useRef(new Animated.Value(550)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -31,12 +31,12 @@ export default function CategorySwitcherModal({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 220,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          tension: 70,
+          tension: 75,
           friction: 12,
           useNativeDriver: true,
         }),
@@ -45,17 +45,44 @@ export default function CategorySwitcherModal({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 150,
+          duration: 160,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
-          toValue: 300,
-          duration: 150,
+          toValue: 550,
+          duration: 180,
           useNativeDriver: true,
         }),
       ]).start();
     }
   }, [visible]);
+
+  // Pull-down dismiss PanResponder for iOS sheet feel
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          slideAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 80 || gestureState.vy > 0.5) {
+          Haptics.selectionAsync().catch(() => {});
+          onClose();
+        } else {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 80,
+            friction: 12,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleSelect = (index) => {
     Haptics.selectionAsync().catch(() => {});
@@ -72,11 +99,11 @@ export default function CategorySwitcherModal({
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-          {Platform.OS === 'ios' ? (
-            <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFill} />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, styles.androidBackdropFallback]} />
-          )}
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 70 : 50}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
         </Animated.View>
       </TouchableWithoutFeedback>
 
@@ -89,8 +116,8 @@ export default function CategorySwitcherModal({
             },
           ]}
         >
-          {/* iOS Grab Handle */}
-          <View style={styles.handleContainer}>
+          {/* iOS Grab Handle with pull-down gesture */}
+          <View style={styles.handleContainer} {...handlePanResponder.panHandlers}>
             <View style={styles.handleBar} />
           </View>
 
@@ -107,7 +134,7 @@ export default function CategorySwitcherModal({
 
           {/* Category Cards List */}
           <View style={styles.cardsList}>
-            {categories.map((cat, idx) => {
+            {categories.map((cat) => {
               const isActive = currentTab === cat.id;
               const catStat = stats[cat.id];
 
@@ -170,17 +197,14 @@ export default function CategorySwitcherModal({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-  },
-  androidBackdropFallback: {
-    backgroundColor: 'rgba(4, 4, 8, 0.88)',
+    backgroundColor: 'rgba(0, 0, 0, 0.70)',
   },
   sheetWrapper: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: 'rgba(16, 18, 26, 0.96)',
+    backgroundColor: 'rgba(14, 16, 24, 0.95)',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     borderWidth: 1.2,
@@ -205,19 +229,19 @@ const styles = StyleSheet.create({
   },
   handleContainer: {
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   handleBar: {
     width: 44,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 12,
+    marginVertical: 10,
   },
   sheetTitle: {
     fontFamily: 'NDOT57',
@@ -244,13 +268,14 @@ const styles = StyleSheet.create({
   closeBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
+    fontWeight: 'bold',
   },
   cardsList: {
-    gap: 10,
+    gap: 8,
     marginTop: 6,
   },
   categoryCard: {
-    padding: 0,
+    marginVertical: 2,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -260,56 +285,58 @@ const styles = StyleSheet.create({
   categoryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     flex: 1,
   },
   categoryDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#40404C',
+    backgroundColor: '#404050',
+    marginRight: 12,
   },
   categoryDotActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#FFFFFF',
-    shadowRadius: 6,
+    shadowRadius: 8,
     shadowOpacity: 1,
   },
   categoryLabel: {
     fontFamily: 'NDOT57',
-    fontSize: 13,
-    color: '#D0D0DC',
+    fontSize: 12,
+    color: '#B0B0C0',
     letterSpacing: 1.5,
   },
   categoryLabelActive: {
     color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   categoryDesc: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#888894',
+    fontSize: 8.5,
+    color: '#656575',
     marginTop: 2,
+    letterSpacing: 0.5,
   },
   statPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
   },
   statPillActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
+    borderColor: 'rgba(255, 255, 255, 0.55)',
   },
   statPillText: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#A0A0B0',
+    fontSize: 8.5,
+    color: '#707080',
     letterSpacing: 1,
   },
   statPillTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
 });
