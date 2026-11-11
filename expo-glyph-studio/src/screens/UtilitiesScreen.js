@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 28,
+    paddingBottom: 115,
     gap: 12,
   },
   cardHeader: {

@@ -13,6 +13,7 @@ import {
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlyphColors } from './src/theme/colors';
 
 import GlyphCameraSilhouette from './src/components/GlyphCameraSilhouette';
@@ -322,8 +323,9 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ExpoStatusBar style="light" />
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <ExpoStatusBar style="light" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -411,14 +413,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* iOS Liquid Glass Navigation Tab Bar with Sliding Liquid Glass Pill */}
-      <LiquidGlassTabBar
-        tabs={TABS}
-        currentTab={currentTab}
-        onSelectTab={handleTabSwitch}
-        onOpenCategorySwitcher={() => setIsCategorySwitcherOpen(true)}
-      />
-
       {/* Active Screen View with Swipe Gestures & Smooth Spring Transition Animation */}
       <Animated.View
         style={[
@@ -473,6 +467,14 @@ export default function App() {
         )}
       </Animated.View>
 
+      {/* Floating Glassmorphic Tab Bar (Liquid Glass) positioned at the bottom */}
+      <LiquidGlassTabBar
+        tabs={TABS}
+        currentTab={currentTab}
+        onSelectTab={handleTabSwitch}
+        onOpenCategorySwitcher={() => setIsCategorySwitcherOpen(true)}
+      />
+
       {/* iOS Liquid Glass Category Switcher Sheet Modal */}
       <CategorySwitcherModal
         visible={isCategorySwitcherOpen}
@@ -483,6 +485,7 @@ export default function App() {
         stats={categoryStats}
       />
     </SafeAreaView>
+  </SafeAreaProvider>
   );
 }
 
