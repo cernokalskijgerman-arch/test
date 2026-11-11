@@ -8,16 +8,28 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from '../components/LiquidGlassCard';
+import GlyphSlider from '../components/GlyphSlider';
 import { GlyphColors } from '../theme/colors';
 
+/**
+ * Screen 4: «МУЗЫКА»
+ * FFT Reactive Audio Visualizer with 3 frequency meters and sensitivity slider.
+ */
 export default function VisualizerScreen({ brightness, onBrightnessChange }) {
   const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState('spectrum'); // 'spectrum' | 'wave' | 'pulse'
+  const [sensitivity, setSensitivity] = useState(85);
   const [bass, setBass] = useState(0);
   const [mid, setMid] = useState(0);
   const [treble, setTreble] = useState(0);
 
   const timerRef = useRef(null);
   const tickRef = useRef(0);
+  const sensitivityRef = useRef(sensitivity);
+  sensitivityRef.current = sensitivity;
+
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   useEffect(() => {
     if (!isActive) {
@@ -35,12 +47,34 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
     }
 
     timerRef.current = setInterval(() => {
-      tickRef.current += 0.24;
+      const sens = sensitivityRef.current / 100;
+      const curMode = modeRef.current;
+
+      tickRef.current += 0.22;
       const t = tickRef.current;
 
-      const curBass = Math.max(0, Math.sin(t) * 0.95);
-      const curMid = Math.max(0, Math.cos(t * 1.6) * 0.78);
-      const curTreble = Math.max(0, Math.sin(t * 2.8) * 0.88);
+      let curBass = 0;
+      let curMid = 0;
+      let curTreble = 0;
+
+      if (curMode === 'spectrum') {
+        curBass = Math.max(0, Math.sin(t * 1.1) * 0.9 * sens + (Math.sin(t * 0.4) > 0.5 ? 0.3 : 0));
+        curMid = Math.max(0, Math.cos(t * 1.8) * 0.8 * sens);
+        curTreble = Math.max(0, Math.sin(t * 3.2) * 0.85 * sens);
+      } else if (curMode === 'wave') {
+        curBass = Math.max(0, (Math.sin(t) * 0.5 + 0.5) * sens);
+        curMid = Math.max(0, (Math.sin(t + 1.2) * 0.5 + 0.5) * sens);
+        curTreble = Math.max(0, (Math.sin(t + 2.4) * 0.5 + 0.5) * sens);
+      } else if (curMode === 'pulse') {
+        const beat = Math.sin(t * 2) > 0.6 ? 1 : 0.05;
+        curBass = beat * sens;
+        curMid = Math.max(0, (beat * 0.7 + Math.sin(t * 4) * 0.25) * sens);
+        curTreble = Math.max(0, (beat * 0.5 + Math.cos(t * 6) * 0.3) * sens);
+      }
+
+      curBass = Math.min(1, Math.max(0, curBass));
+      curMid = Math.min(1, Math.max(0, curMid));
+      curTreble = Math.min(1, Math.max(0, curTreble));
 
       setBass(curBass);
       setMid(curMid);
@@ -63,15 +97,29 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
     };
   }, [isActive]);
 
+  const modes = [
+    { id: 'spectrum', label: 'СПЕКТР' },
+    { id: 'wave', label: 'ВОЛНА' },
+    { id: 'pulse', label: 'БАС-ПУЛЬС' },
+  ];
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <LiquidGlassCard>
+      {/* ============================================================ */}
+      {/* 1. VISUALIZER MASTER CARD                                    */}
+      {/* ============================================================ */}
+      <LiquidGlassCard isActive={isActive}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>FFT ВИЗУАЛИЗАТОР</Text>
+          <View>
+            <Text style={styles.title}>FFT ВИЗУАЛИЗАТОР МУЗЫКИ</Text>
+            <Text style={styles.subtitle}>
+              Реакция глифов на частотный спектр звука
+            </Text>
+          </View>
           <TouchableOpacity
             style={[styles.toggleBtn, isActive && styles.toggleBtnActive]}
             onPress={() => {
@@ -81,37 +129,99 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
             activeOpacity={0.7}
           >
             <Text style={[styles.toggleBtnText, isActive && styles.toggleBtnTextActive]}>
-              {isActive ? 'СТОП' : 'СТАРТ'}
+              {isActive ? '■ СТОП' : '▶ СТАРТ'}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Mode Selector */}
+        <View style={styles.modesRow}>
+          {modes.map((m) => {
+            const isSelected = mode === m.id;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={[styles.modeBtn, isSelected && styles.modeBtnActive]}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setMode(m.id);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.modeBtnText,
+                    isSelected && styles.modeBtnTextActive,
+                  ]}
+                >
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.divider} />
 
         {/* 3 Spectrum Meters */}
         <View style={styles.metersRow}>
           {/* Mids -> Top-Left Arc */}
           <View style={styles.meterCol}>
             <View style={styles.barBg}>
-              <View style={[styles.barFill, { height: `${Math.round(mid * 100)}%` }]} />
+              <View
+                style={[
+                  styles.barFill,
+                  { height: `${Math.round(mid * 100)}%` },
+                ]}
+              />
             </View>
             <Text style={styles.meterLabel}>ВЕРХ-ЛЕВО</Text>
+            <Text style={styles.meterFreq}>СЧ (MID)</Text>
           </View>
 
           {/* Treble -> Bottom-Left Arc */}
           <View style={styles.meterCol}>
             <View style={styles.barBg}>
-              <View style={[styles.barFill, { height: `${Math.round(treble * 100)}%` }]} />
+              <View
+                style={[
+                  styles.barFill,
+                  { height: `${Math.round(treble * 100)}%` },
+                ]}
+              />
             </View>
             <Text style={styles.meterLabel}>НИЗ-ЛЕВО</Text>
+            <Text style={styles.meterFreq}>ВЧ (TREBLE)</Text>
           </View>
 
           {/* Bass -> Right Arc */}
           <View style={styles.meterCol}>
             <View style={styles.barBg}>
-              <View style={[styles.barFill, { height: `${Math.round(bass * 100)}%` }]} />
+              <View
+                style={[
+                  styles.barFill,
+                  { height: `${Math.round(bass * 100)}%` },
+                ]}
+              />
             </View>
-            <Text style={styles.meterLabel}>ПРАВО</Text>
+            <Text style={styles.meterLabel}>ПРАВАЯ</Text>
+            <Text style={styles.meterFreq}>НЧ (BASS)</Text>
           </View>
         </View>
+
+        <View style={styles.divider} />
+
+        {/* Sensitivity Slider */}
+        <GlyphSlider
+          label="ЧУВСТВИТЕЛЬНОСТЬ РЕАКЦИИ"
+          value={sensitivity}
+          min={10}
+          max={100}
+          step={1}
+          unit="%"
+          displayValue={`${sensitivity}%`}
+          accentColor="#FFFFFF"
+          onValueChange={(val) => setSensitivity(val)}
+        />
       </LiquidGlassCard>
     </ScrollView>
   );
@@ -124,28 +234,34 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 24,
+    paddingBottom: 28,
     gap: 12,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   title: {
     fontFamily: 'NDOT57',
-    fontSize: 14,
+    fontSize: 12,
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
+  },
+  subtitle: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#8E8E98',
+    marginTop: 2,
   },
   toggleBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   toggleBtnActive: {
     backgroundColor: '#FFFFFF',
@@ -153,29 +269,66 @@ const styles = StyleSheet.create({
   },
   toggleBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 11,
+    fontSize: 10,
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   toggleBtnTextActive: {
     color: '#000000',
+    fontWeight: 'bold',
+  },
+  modesRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+  },
+  modeBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: '#FFFFFF',
+  },
+  modeBtnText: {
+    fontFamily: 'NDOT57',
+    fontSize: 9,
+    color: '#8E8E98',
+    letterSpacing: 0.8,
+  },
+  modeBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 10,
   },
   metersRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   meterCol: {
     alignItems: 'center',
     width: 80,
   },
   barBg: {
-    width: 36,
-    height: 120,
-    borderRadius: 10,
+    width: 40,
+    height: 130,
+    borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.2,
+    borderTopColor: 'rgba(255, 255, 255, 0.3)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.18)',
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'flex-end',
     overflow: 'hidden',
     padding: 3,
@@ -183,16 +336,22 @@ const styles = StyleSheet.create({
   barFill: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 7,
+    borderRadius: 9,
     shadowColor: '#FFFFFF',
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
   },
   meterLabel: {
     fontFamily: 'NDOT57',
-    fontSize: 10,
-    color: '#8E8E93',
-    letterSpacing: 1,
-    marginTop: 10,
+    fontSize: 9,
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+    marginTop: 8,
+  },
+  meterFreq: {
+    fontFamily: 'NDOT57',
+    fontSize: 7.5,
+    color: '#707080',
+    marginTop: 2,
   },
 });

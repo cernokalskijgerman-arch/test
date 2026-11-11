@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   PanResponder,
+  Animated,
 } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -15,40 +16,54 @@ import * as Haptics from 'expo-haptics';
 import { GlyphColors } from './src/theme/colors';
 
 import GlyphCameraSilhouette from './src/components/GlyphCameraSilhouette';
-import DashboardScreen from './src/screens/DashboardScreen';
+import LiquidGlassTabBar from './src/components/LiquidGlassTabBar';
+import CategorySwitcherModal from './src/components/CategorySwitcherModal';
+
+import ControlScreen from './src/screens/ControlScreen';
+import PixelsScreen from './src/screens/PixelsScreen';
 import SequencerScreen from './src/screens/SequencerScreen';
 import VisualizerScreen from './src/screens/VisualizerScreen';
 import UtilitiesScreen from './src/screens/UtilitiesScreen';
-import ArcadeScreen from './src/screens/ArcadeScreen';
 
 const TABS = [
-  { id: 0, label: 'ХАБ' },
-  { id: 1, label: 'СЕКВЕНСОР' },
-  { id: 2, label: 'МУЗЫКА' },
-  { id: 3, label: 'УТИЛИТЫ' },
-  { id: 4, label: 'АРКАДА' },
+  { id: 0, label: 'КОНТРОЛЬ', subtitle: 'Питание, яркость и 3 дуги' },
+  { id: 1, label: 'ПИКСЕЛИ', subtitle: '36 LED и авто-обход' },
+  { id: 2, label: 'СЕКВЕНСОР', subtitle: '16-шаговые ритмы' },
+  { id: 3, label: 'МУЗЫКА', subtitle: 'FFT визуализатор частот' },
+  { id: 4, label: 'УТИЛИТЫ', subtitle: 'Фонарик, таймер, аркада' },
 ];
 
 export default function App() {
-  // Load official Nothing NDOT 57 Font
   const [fontsLoaded] = useFonts({
     'NDOT57': require('./assets/fonts/Ndot57.otf'),
   });
 
   const [currentTab, setCurrentTab] = useState(0);
+  const [isCategorySwitcherOpen, setIsCategorySwitcherOpen] = useState(false);
+
   // 3 Continuous White Glyph Arcs: [Top-Left, Bottom-Left, Right] (0..255)
   const [brightness, setBrightness] = useState([255, 255, 255]);
   const [masterBrightness, setMasterBrightness] = useState(255);
   const [activePixel, setActivePixel] = useState(null);
+
+  // Auto-walk engine state
   const [isAutoWalk, setIsAutoWalk] = useState(false);
   const [autoWalkSpeed, setAutoWalkSpeed] = useState(80);
+  const [autoWalkMode, setAutoWalkMode] = useState('forward'); // 'forward' | 'reverse' | 'pingpong' | 'random'
   const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(false);
 
+  // Screen transition animation
+  const screenFadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Refs for real-time reactivity without re-render loop tearing
   const autoWalkSpeedRef = useRef(autoWalkSpeed);
   autoWalkSpeedRef.current = autoWalkSpeed;
 
   const isAutoWalkRef = useRef(isAutoWalk);
   isAutoWalkRef.current = isAutoWalk;
+
+  const autoWalkModeRef = useRef(autoWalkMode);
+  autoWalkModeRef.current = autoWalkMode;
 
   const activePixelRef = useRef(activePixel);
   activePixelRef.current = activePixel;
@@ -56,17 +71,39 @@ export default function App() {
   const masterBrightnessRef = useRef(masterBrightness);
   masterBrightnessRef.current = masterBrightness;
 
+  const walkDirectionRef = useRef(1); // 1 = forward, -1 = reverse for pingpong
+  const stepTimerRef = useRef(null);
+  const stepStartTimeRef = useRef(0);
+
+  // Toggle individual arc
   const handleArcPress = useCallback((arcIndex) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBrightness((prev) => {
       const next = [...prev];
       const targetB = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
       next[arcIndex] = next[arcIndex] > 0 ? 0 : targetB;
+
+      // Update master brightness to match max of active arcs
+      const maxB = Math.max(...next);
+      if (maxB !== masterBrightnessRef.current) {
+        setMasterBrightness(maxB);
+      }
       return next;
     });
   }, []);
 
-  // Master brightness handler with immediate 0-cutoff and recovery
+  // Individual arc brightness regulation
+  const handleArcBrightnessChange = useCallback((arcIndex, newVal) => {
+    setBrightness((prev) => {
+      const next = [...prev];
+      next[arcIndex] = newVal;
+      const maxB = Math.max(...next);
+      setMasterBrightness(maxB);
+      return next;
+    });
+  }, []);
+
+  // Master brightness handler: instant 0-cutoff, instant revival > 0, never freezes
   const handleMasterBrightnessChange = useCallback((newVal) => {
     setMasterBrightness(newVal);
     if (newVal <= 0) {
@@ -113,60 +150,105 @@ export default function App() {
     }
   }, []);
 
-  // Auto-walk toggle & circular stepper loop with dynamic speed
+  // Auto-walk toggle
   const handleToggleAutoWalk = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setIsAutoWalk((prev) => !prev);
   }, []);
 
-  // Real-time animation loop: uses autoWalkSpeedRef.current on every step for instant speed responsiveness
+  // Instant auto-walk speed adjustment
+  const handleAutoWalkSpeedChange = useCallback((newSpeed) => {
+    setAutoWalkSpeed(newSpeed);
+    autoWalkSpeedRef.current = newSpeed;
+
+    // If speed was made significantly faster while waiting, accelerate immediately
+    if (isAutoWalkRef.current && stepTimerRef.current) {
+      const elapsed = Date.now() - stepStartTimeRef.current;
+      if (elapsed >= newSpeed) {
+        clearTimeout(stepTimerRef.current);
+        // Step immediately
+        triggerWalkStep();
+      }
+    }
+  }, []);
+
+  // Auto-walk single step executor
+  const triggerWalkStep = useCallback(() => {
+    if (!isAutoWalkRef.current) return;
+
+    stepStartTimeRef.current = Date.now();
+    const current = activePixelRef.current !== null ? activePixelRef.current : -1;
+    const mode = autoWalkModeRef.current;
+    let nextPixel = 0;
+
+    if (mode === 'forward') {
+      nextPixel = (current + 1) % 36;
+    } else if (mode === 'reverse') {
+      nextPixel = current <= 0 ? 35 : current - 1;
+    } else if (mode === 'pingpong') {
+      if (current >= 35) walkDirectionRef.current = -1;
+      else if (current <= 0) walkDirectionRef.current = 1;
+      nextPixel = Math.max(0, Math.min(35, current + walkDirectionRef.current));
+    } else if (mode === 'random') {
+      nextPixel = Math.floor(Math.random() * 36);
+    }
+
+    activePixelRef.current = nextPixel;
+    setActivePixel(nextPixel);
+
+    const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+    let arc = 0;
+    if (nextPixel >= 0 && nextPixel <= 19) arc = 0; // Top-Left
+    else if (nextPixel >= 20 && nextPixel <= 30) arc = 2; // Right
+    else if (nextPixel >= 31 && nextPixel <= 35) arc = 1; // Bottom-Left
+    const nextB = [0, 0, 0];
+    nextB[arc] = b;
+    setBrightness(nextB);
+
+    const speed = Math.max(20, autoWalkSpeedRef.current || 80);
+    stepTimerRef.current = setTimeout(triggerWalkStep, speed);
+  }, []);
+
+  // Real-time animation loop lifecycle
   useEffect(() => {
     if (!isAutoWalk) {
+      if (stepTimerRef.current) {
+        clearTimeout(stepTimerRef.current);
+        stepTimerRef.current = null;
+      }
       return;
     }
 
-    let isCancelled = false;
-    let timerId = null;
-
-    const runStep = () => {
-      if (isCancelled || !isAutoWalkRef.current) return;
-
-      const current = activePixelRef.current !== null ? activePixelRef.current : -1;
-      const nextPixel = (current + 1) % 36;
-      activePixelRef.current = nextPixel;
-      setActivePixel(nextPixel);
-
-      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
-      let arc = 0;
-      if (nextPixel >= 0 && nextPixel <= 19) arc = 0; // Top-Left
-      else if (nextPixel >= 20 && nextPixel <= 30) arc = 2; // Right
-      else if (nextPixel >= 31 && nextPixel <= 35) arc = 1; // Bottom-Left
-      const nextB = [0, 0, 0];
-      nextB[arc] = b;
-      setBrightness(nextB);
-
-      // Instantaneous speed adjustment from ref
-      const currentSpeed = Math.max(20, autoWalkSpeedRef.current || 80);
-      timerId = setTimeout(runStep, currentSpeed);
-    };
-
-    runStep();
+    triggerWalkStep();
 
     return () => {
-      isCancelled = true;
-      if (timerId) clearTimeout(timerId);
+      if (stepTimerRef.current) {
+        clearTimeout(stepTimerRef.current);
+        stepTimerRef.current = null;
+      }
     };
-  }, [isAutoWalk]);
+  }, [isAutoWalk, triggerWalkStep]);
 
-  const handleTabSwitch = (tabIndex) => {
+  // Tab switch with smooth transition animation
+  const handleTabSwitch = useCallback((tabIndex) => {
+    if (tabIndex === currentTab) return;
     Haptics.selectionAsync().catch(() => {});
-    setCurrentTab(tabIndex);
-  };
 
-  const handleTriggerQuickUtility = (type) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    setCurrentTab(3);
-  };
+    Animated.sequence([
+      Animated.timing(screenFadeAnim, {
+        toValue: 0.35,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenFadeAnim, {
+        toValue: 1,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setCurrentTab(tabIndex);
+  }, [currentTab, screenFadeAnim]);
 
   // Horizontal swipe between tabs
   const panResponder = useRef(
@@ -176,17 +258,15 @@ export default function App() {
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx < -50) {
-          setCurrentTab((curr) => {
-            const next = Math.min(curr + 1, TABS.length - 1);
-            if (next !== curr) Haptics.selectionAsync().catch(() => {});
-            return next;
-          });
+          // Swipe Left -> Next Tab
+          if (currentTab < TABS.length - 1) {
+            handleTabSwitch(currentTab + 1);
+          }
         } else if (gestureState.dx > 50) {
-          setCurrentTab((curr) => {
-            const next = Math.max(curr - 1, 0);
-            if (next !== curr) Haptics.selectionAsync().catch(() => {});
-            return next;
-          });
+          // Swipe Right -> Prev Tab
+          if (currentTab > 0) {
+            handleTabSwitch(currentTab - 1);
+          }
         }
       },
     })
@@ -202,6 +282,15 @@ export default function App() {
 
   const isAnyOn = brightness.some((b) => b > 10);
 
+  // Live status previews for Category Switcher
+  const categoryStats = {
+    0: masterBrightness > 0 ? `${Math.round((masterBrightness / 255) * 100)}% ЯРКОСТЬ` : 'ВЫКЛ',
+    1: isAutoWalk ? `АВТО ${autoWalkSpeed}МС` : (activePixel !== null ? `LED #${activePixel}` : '36 LED'),
+    2: '16 ШАГОВ',
+    3: 'FFT СПЕКТР',
+    4: 'ИНСТРУМЕНТЫ',
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ExpoStatusBar style="light" />
@@ -212,12 +301,16 @@ export default function App() {
           <View style={styles.pulseDot} />
           <Text style={styles.headerTitle}>GLYPH (STUDIO)</Text>
         </View>
-        <View style={styles.headerBadge}>
-          <Text style={styles.deviceTag}>PHONE (3A)</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.headerBadge}
+          onPress={() => setIsCategorySwitcherOpen(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.deviceTag}>РАЗДЕЛЫ ▾</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Persistent Floating Camera Module (NO phone body chassis) */}
+      {/* Persistent Floating Camera Module (NO phone chassis) */}
       <View style={styles.simulatorContainer}>
         {!isMatrixCollapsed ? (
           <>
@@ -225,7 +318,7 @@ export default function App() {
               brightness={brightness}
               activePixel={activePixel}
               onArcPress={handleArcPress}
-              size={220}
+              size={215}
             />
 
             {/* 3 Quick Arc Toggles */}
@@ -288,72 +381,71 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Navigation Tabs (NDOT Font) */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => {
-          const isSelected = currentTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tabButton, isSelected && styles.tabButtonActive]}
-              onPress={() => handleTabSwitch(tab.id)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[styles.tabText, isSelected && styles.tabTextActive]}
-                numberOfLines={1}
-              >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* iOS Liquid Glass Navigation Tab Bar */}
+      <LiquidGlassTabBar
+        tabs={TABS}
+        currentTab={currentTab}
+        onSelectTab={handleTabSwitch}
+        onOpenCategorySwitcher={() => setIsCategorySwitcherOpen(true)}
+      />
 
-      {/* Active Screen View with Swipe Gestures */}
-      <View style={styles.screenContainer} {...panResponder.panHandlers}>
+      {/* Active Screen View with Swipe Gestures & Smooth Fade Animation */}
+      <Animated.View
+        style={[styles.screenContainer, { opacity: screenFadeAnim }]}
+        {...panResponder.panHandlers}
+      >
         {currentTab === 0 && (
-          <DashboardScreen
+          <ControlScreen
             brightness={brightness}
             masterBrightness={masterBrightness}
             onMasterBrightnessChange={handleMasterBrightnessChange}
-            activePixel={activePixel}
-            onActivePixelChange={handleActivePixelChange}
-            isAutoWalk={isAutoWalk}
-            onToggleAutoWalk={handleToggleAutoWalk}
-            autoWalkSpeed={autoWalkSpeed}
-            onAutoWalkSpeedChange={setAutoWalkSpeed}
-            onNavigateTab={handleTabSwitch}
-            onTriggerUtility={handleTriggerQuickUtility}
+            onArcBrightnessChange={handleArcBrightnessChange}
+            onArcToggle={handleArcPress}
             onAllOn={handleAllOn}
             onAllOff={handleAllOff}
           />
         )}
         {currentTab === 1 && (
+          <PixelsScreen
+            activePixel={activePixel}
+            onActivePixelChange={handleActivePixelChange}
+            isAutoWalk={isAutoWalk}
+            onToggleAutoWalk={handleToggleAutoWalk}
+            autoWalkSpeed={autoWalkSpeed}
+            onAutoWalkSpeedChange={handleAutoWalkSpeedChange}
+            autoWalkMode={autoWalkMode}
+            onAutoWalkModeChange={setAutoWalkMode}
+          />
+        )}
+        {currentTab === 2 && (
           <SequencerScreen
             brightness={brightness}
             onBrightnessChange={setBrightness}
           />
         )}
-        {currentTab === 2 && (
+        {currentTab === 3 && (
           <VisualizerScreen
             brightness={brightness}
             onBrightnessChange={setBrightness}
           />
         )}
-        {currentTab === 3 && (
+        {currentTab === 4 && (
           <UtilitiesScreen
             brightness={brightness}
             onBrightnessChange={setBrightness}
           />
         )}
-        {currentTab === 4 && (
-          <ArcadeScreen
-            brightness={brightness}
-            onBrightnessChange={setBrightness}
-          />
-        )}
-      </View>
+      </Animated.View>
+
+      {/* iOS Liquid Glass Category Switcher Modal */}
+      <CategorySwitcherModal
+        visible={isCategorySwitcherOpen}
+        categories={TABS}
+        currentTab={currentTab}
+        onSelectTab={handleTabSwitch}
+        onClose={() => setIsCategorySwitcherOpen(false)}
+        stats={categoryStats}
+      />
     </SafeAreaView>
   );
 }
@@ -375,7 +467,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -392,7 +484,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: 'NDOT57',
-    fontSize: 18,
+    fontSize: 17,
     color: '#FFFFFF',
     letterSpacing: 2,
   },
@@ -413,7 +505,7 @@ const styles = StyleSheet.create({
   simulatorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
   arcPillRow: {
     flexDirection: 'row',
@@ -484,43 +576,13 @@ const styles = StyleSheet.create({
   collapseToggle: {
     paddingVertical: 4,
     paddingHorizontal: 10,
-    marginTop: 2,
+    marginTop: 1,
   },
   collapseToggleText: {
     fontFamily: 'NDOT57',
     fontSize: 9,
     color: '#666666',
     letterSpacing: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  tabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  tabText: {
-    fontFamily: 'NDOT57',
-    fontSize: 10,
-    color: '#8E8E93',
-    letterSpacing: 1,
-  },
-  tabTextActive: {
-    color: '#000000',
-    fontFamily: 'NDOT57',
   },
   screenContainer: {
     flex: 1,
