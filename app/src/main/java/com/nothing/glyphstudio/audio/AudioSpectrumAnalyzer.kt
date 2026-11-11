@@ -140,33 +140,35 @@ class AudioSpectrumAnalyzer {
     }
 
     private fun applyToGlyphs(bass: Float, mid: Float, treble: Float) {
-        val total = GlyphController.activeDevice.value.totalSegments
+        val device = GlyphController.activeDevice.value
+        val total = device.totalSegments
         val array = IntArray(total)
 
-        // 1. Top-Left Arc (0..11, 12 LEDs) reacts to Mids (vocals/synth)
-        val midLedCount = (mid * 12).toInt()
-        for (i in 0 until 12) {
-            if (i < midLedCount && i < total) {
-                array[i] = (255 * mid).toInt().coerceIn(0, 255)
-            }
+        // 1. Zone 0: Top-Left Arc (20 LEDs on Phone 3a Pro, #0..19) reacts to Mids (vocals/synth)
+        val zone0 = GlyphController.getZoneChannels(device, 0)
+        val midCount = (mid * zone0.size).toInt().coerceIn(0, zone0.size)
+        val midVal = (255 * mid).toInt().coerceIn(0, 255)
+        for (i in 0 until midCount) {
+            val ch = zone0[i]
+            if (ch < total) array[ch] = midVal
         }
 
-        // 2. Bottom-Left Arc (12..17, 6 LEDs) reacts to Treble (high-hats/cymbals)
-        val trebleLedCount = (treble * 6).toInt()
-        for (i in 0 until 6) {
-            val idx = 12 + i
-            if (i < trebleLedCount && idx < total) {
-                array[idx] = (255 * treble).toInt().coerceIn(0, 255)
-            }
+        // 2. Zone 1: Bottom-Left Arc (5 LEDs on Phone 3a Pro, #31..35) reacts to Treble (high-hats/cymbals)
+        val zone1 = GlyphController.getZoneChannels(device, 1)
+        val trebleCount = (treble * zone1.size).toInt().coerceIn(0, zone1.size)
+        val trebleVal = (255 * treble).toInt().coerceIn(0, 255)
+        for (i in 0 until trebleCount) {
+            val ch = zone1[i]
+            if (ch < total) array[ch] = trebleVal
         }
 
-        // 3. Right Arc (18..33, 16 LEDs) reacts to Bass (kick/sub-bass)
-        val bassLedCount = (bass * 16).toInt()
-        for (i in 0 until 16) {
-            val idx = 18 + i
-            if (i < bassLedCount && idx < total) {
-                array[idx] = (255 * bass).toInt().coerceIn(0, 255)
-            }
+        // 3. Zone 2: Right Arc (11 LEDs on Phone 3a Pro, #20..30) reacts to Bass (kick/sub-bass)
+        val zone2 = GlyphController.getZoneChannels(device, 2)
+        val bassCount = (bass * zone2.size).toInt().coerceIn(0, zone2.size)
+        val bassVal = (255 * bass).toInt().coerceIn(0, 255)
+        for (i in 0 until bassCount) {
+            val ch = zone2[i]
+            if (ch < total) array[ch] = bassVal
         }
 
         GlyphController.updateFrame(GlyphFrame(segmentBrightness = array))

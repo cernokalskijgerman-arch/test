@@ -280,6 +280,31 @@ object GlyphController {
         return (brightness * 4095 + 127) / 255
     }
 
+    private fun createHardwareBuilder(targetDeviceCode: String, requiredChannels: Int): KetchumHardwareFrame.Builder {
+        val manager = glyphManager
+        val builder = try {
+            KetchumHardwareFrame.Builder(targetDeviceCode)
+        } catch (e: Throwable) {
+            manager?.getGlyphFrameBuilder() ?: KetchumHardwareFrame.Builder()
+        }
+
+        // Defensive reflection check: verify channel list capacity and dynamically expand if necessary
+        try {
+            val f = builder.javaClass.getDeclaredField("channel").apply { isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            val channelList = f.get(builder) as? java.util.ArrayList<Int?>
+            if (channelList != null && channelList.size < requiredChannels) {
+                while (channelList.size < requiredChannels) {
+                    channelList.add(0)
+                }
+            }
+        } catch (e: Throwable) {
+            log("WARN", "createHardwareBuilder reflection check: ${e.message}")
+        }
+
+        return builder
+    }
+
     fun updateFrame(frame: GlyphFrame) {
         _currentFrame.value = frame
 
@@ -298,36 +323,14 @@ object GlyphController {
             }
 
             val targetDeviceCode = _activeDevice.value.deviceCode
-            val builder = try {
-                com.nothing.ketchum.GlyphFrame.Builder(targetDeviceCode)
-            } catch (e: Throwable) {
-                manager.getGlyphFrameBuilder()
-            }
+            val builder = createHardwareBuilder(targetDeviceCode, frame.segmentBrightness.size)
 
-            // Defensive reflection check: verify channel list capacity and dynamically expand if necessary
-            val channelList = try {
-                val f = builder.javaClass.getDeclaredField("channel").apply { isAccessible = true }
-                @Suppress("UNCHECKED_CAST")
-                f.get(builder) as? java.util.ArrayList<Int?>
-            } catch (e: Throwable) {
-                null
-            }
-
-            if (channelList != null && channelList.size < frame.segmentBrightness.size) {
-                while (channelList.size < frame.segmentBrightness.size) {
-                    channelList.add(0)
-                }
-            }
-
-            val maxChannels = channelList?.size ?: frame.segmentBrightness.size
             for (i in frame.segmentBrightness.indices) {
-                if (i < maxChannels) {
-                    try {
-                        val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
-                        builder.buildChannel(i, hwLight)
-                    } catch (e: Throwable) {
-                        log("WARN", "buildChannel($i) failed: ${e.message}")
-                    }
+                try {
+                    val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
+                    builder.buildChannel(i, hwLight)
+                } catch (e: Throwable) {
+                    log("WARN", "buildChannel($i) failed: ${e.message}")
                 }
             }
             val hwFrame = builder.build()
@@ -538,10 +541,15 @@ object GlyphController {
         if (_connectionState.value != HardwareConnectionState.CONNECTED) return
 
         try {
-            val builder = manager.getGlyphFrameBuilder()
+            val targetDeviceCode = _activeDevice.value.deviceCode
+            val builder = createHardwareBuilder(targetDeviceCode, frame.segmentBrightness.size)
             for (i in frame.segmentBrightness.indices) {
-                val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
-                builder.buildChannel(i, hwLight)
+                try {
+                    val hwLight = toHardwareBrightness(frame.segmentBrightness[i])
+                    builder.buildChannel(i, hwLight)
+                } catch (e: Throwable) {
+                    log("WARN", "animateHardwareFrame buildChannel($i) failed: ${e.message}")
+                }
             }
             try {
                 builder.buildPeriod(durationMs)

@@ -95,17 +95,18 @@ fun SequencerScreen(
             val bBL = trackBottomLeft[currentStep]
             val bR = trackRight[currentStep]
 
-            // Top-Left (0..19)
-            for (ch in Phone3aProLayout.ZONE_TOP_LEFT_CHANNELS) {
+            val dev = GlyphController.activeDevice.value
+            // Zone 0: Top-Left Arc
+            for (ch in GlyphController.getZoneChannels(dev, 0)) {
                 if (ch < total) array[ch] = bTL
             }
-            // Right (20..30)
-            for (ch in Phone3aProLayout.ZONE_RIGHT_CHANNELS) {
-                if (ch < total) array[ch] = bR
-            }
-            // Bottom-Left (31..35)
-            for (ch in Phone3aProLayout.ZONE_BOTTOM_LEFT_CHANNELS) {
+            // Zone 1: Bottom-Left Arc
+            for (ch in GlyphController.getZoneChannels(dev, 1)) {
                 if (ch < total) array[ch] = bBL
+            }
+            // Zone 2: Right Arc
+            for (ch in GlyphController.getZoneChannels(dev, 2)) {
+                if (ch < total) array[ch] = bR
             }
 
             GlyphController.updateFrame(GlyphFrame(segmentBrightness = array))
