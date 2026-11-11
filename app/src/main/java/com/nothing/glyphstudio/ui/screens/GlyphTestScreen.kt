@@ -82,13 +82,22 @@ fun GlyphTestScreen(
     var selectedChannel by remember { mutableIntStateOf(0) }
     var isLogsExpanded by remember { mutableStateOf(false) }
 
-    // Zone states
-    var zoneAOn by remember { mutableStateOf(false) }
-    var zoneBOn by remember { mutableStateOf(false) }
-    var zoneCOn by remember { mutableStateOf(false) }
+    // Zone states dynamically synchronized with physical frame & active device model
+    val zone0Channels = remember(activeDevice) { GlyphController.getZoneChannels(activeDevice, 0) }
+    val zone1Channels = remember(activeDevice) { GlyphController.getZoneChannels(activeDevice, 1) }
+    val zone2Channels = remember(activeDevice) { GlyphController.getZoneChannels(activeDevice, 2) }
+
+    val zoneAOn = zone0Channels.isNotEmpty() && zone0Channels.all { ch -> currentFrame.segmentBrightness.getOrNull(ch)?.let { it > 0 } == true }
+    val zoneBOn = zone1Channels.isNotEmpty() && zone1Channels.all { ch -> currentFrame.segmentBrightness.getOrNull(ch)?.let { it > 0 } == true }
+    val zoneCOn = zone2Channels.isNotEmpty() && zone2Channels.all { ch -> currentFrame.segmentBrightness.getOrNull(ch)?.let { it > 0 } == true }
+
+    val zoneAName = GlyphController.getZoneName(activeDevice, 0)
+    val zoneBName = GlyphController.getZoneName(activeDevice, 1)
+    val zoneCName = GlyphController.getZoneName(activeDevice, 2)
 
     val activeCount = currentFrame.segmentBrightness.count { it > 0 }
     val totalSegments = activeDevice.totalSegments
+    val safeSelectedChannel = selectedChannel.coerceIn(0, (totalSegments - 1).coerceAtLeast(0))
 
     Column(
         modifier = modifier
@@ -306,9 +315,6 @@ fun GlyphTestScreen(
                 ) {
                     Button(
                         onClick = {
-                            zoneAOn = true
-                            zoneBOn = true
-                            zoneCOn = true
                             GlyphController.turnAllOn(masterBrightness.toInt())
                         },
                         modifier = Modifier.weight(1f),
@@ -326,9 +332,6 @@ fun GlyphTestScreen(
 
                     Button(
                         onClick = {
-                            zoneAOn = false
-                            zoneBOn = false
-                            zoneCOn = false
                             GlyphController.turnAllOff()
                         },
                         modifier = Modifier.weight(1f),
@@ -424,40 +427,37 @@ fun GlyphTestScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Zone A: Top-Left (11 LEDs)
+                // Zone A (Top-Left or First Arc)
                 ZoneToggleRow(
-                    title = "Дуга 1: Верх-Лево (Зона A)",
-                    subtitle = "11 светодиодов (каналы 20..30)",
+                    title = zoneAName,
+                    subtitle = "Каналы: ${if (zone0Channels.size > 8) "${zone0Channels.first()}..${zone0Channels.last()} (${zone0Channels.size} LEDs)" else zone0Channels.joinToString(", ")}",
                     isOn = zoneAOn,
                     onToggle = {
-                        zoneAOn = !zoneAOn
-                        GlyphController.setZoneState(0, zoneAOn, masterBrightness.toInt())
+                        GlyphController.setZoneState(0, !zoneAOn, masterBrightness.toInt())
                     }
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Zone B: Bottom-Left (5 LEDs)
+                // Zone B (Bottom-Left or Second Arc)
                 ZoneToggleRow(
-                    title = "Дуга 2: Низ-Лево (Зона B)",
-                    subtitle = "5 светодиодов (каналы 31..35)",
+                    title = zoneBName,
+                    subtitle = "Каналы: ${if (zone1Channels.size > 8) "${zone1Channels.first()}..${zone1Channels.last()} (${zone1Channels.size} LEDs)" else zone1Channels.joinToString(", ")}",
                     isOn = zoneBOn,
                     onToggle = {
-                        zoneBOn = !zoneBOn
-                        GlyphController.setZoneState(1, zoneBOn, masterBrightness.toInt())
+                        GlyphController.setZoneState(1, !zoneBOn, masterBrightness.toInt())
                     }
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Zone C: Right (20 LEDs)
+                // Zone C (Right Arc or Third Arc)
                 ZoneToggleRow(
-                    title = "Дуга 3: Справа (Зона C)",
-                    subtitle = "20 светодиодов (каналы 0..19)",
+                    title = zoneCName,
+                    subtitle = "Каналы: ${if (zone2Channels.size > 8) "${zone2Channels.first()}..${zone2Channels.last()} (${zone2Channels.size} LEDs)" else zone2Channels.joinToString(", ")}",
                     isOn = zoneCOn,
                     onToggle = {
-                        zoneCOn = !zoneCOn
-                        GlyphController.setZoneState(2, zoneCOn, masterBrightness.toInt())
+                        GlyphController.setZoneState(2, !zoneCOn, masterBrightness.toInt())
                     }
                 )
             }
@@ -495,8 +495,9 @@ fun GlyphTestScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF222228))
                             .clickable {
-                                selectedChannel = ((selectedChannel - 1) % totalSegments + totalSegments) % totalSegments
-                                GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
+                                val prev = ((safeSelectedChannel - 1) % totalSegments + totalSegments) % totalSegments
+                                selectedChannel = prev
+                                GlyphController.setSingleChannel(prev, masterBrightness.toInt())
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -505,18 +506,13 @@ fun GlyphTestScreen(
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "КАНАЛ #$selectedChannel",
+                            text = "КАНАЛ #$safeSelectedChannel",
                             color = GlyphColors.NeonRed,
                             fontSize = 15.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         )
-                        val zoneInfo = when (selectedChannel) {
-                            in 20..30 -> "Дуга 1 (Верх-Лево) #${selectedChannel - 20}"
-                            in 31..35 -> "Дуга 2 (Низ-Лево) #${selectedChannel - 31}"
-                            in 0..19 -> "Дуга 3 (Справа) #$selectedChannel"
-                            else -> "Канал #$selectedChannel"
-                        }
+                        val zoneInfo = GlyphController.getChannelZoneDescription(activeDevice, safeSelectedChannel)
                         Text(
                             text = zoneInfo,
                             color = Color.White,
@@ -531,8 +527,9 @@ fun GlyphTestScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF222228))
                             .clickable {
-                                selectedChannel = (selectedChannel + 1) % totalSegments
-                                GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
+                                val next = (safeSelectedChannel + 1) % totalSegments
+                                selectedChannel = next
+                                GlyphController.setSingleChannel(next, masterBrightness.toInt())
                             },
                         contentAlignment = Alignment.Center
                     ) {

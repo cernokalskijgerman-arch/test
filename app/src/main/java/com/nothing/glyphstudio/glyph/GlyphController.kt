@@ -227,11 +227,14 @@ object GlyphController {
             _statusMessage.value = "Подключено к Glyph Service (${_activeDevice.value.displayName})"
             log("SUCCESS", "Физические глифы готовы к управлению!")
 
-            // Pulse victory confirmation
-            turnAllOn(brightness = 180)
+            // Gentle connection confirmation flash (150ms) that does not disrupt user state
+            val total = _activeDevice.value.totalSegments
+            updateFrame(GlyphFrame(segmentBrightness = IntArray(total) { 150 }))
             CoroutineScope(Dispatchers.Default).launch {
-                delay(200)
-                turnAllOff()
+                delay(150)
+                if (_activeAnimation.value == null && _currentFrame.value.segmentBrightness.all { it == 150 }) {
+                    updateFrame(GlyphFrame(segmentBrightness = IntArray(total)))
+                }
             }
         } catch (e: Throwable) {
             log("ERROR", "Ошибка регистрации Glyph сессии: ${e.javaClass.simpleName} - ${e.message}")
@@ -243,7 +246,7 @@ object GlyphController {
 
     fun reconnect(context: Context) {
         log("CMD", "Переподключение Glyph SDK...")
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = true)
         try {
             glyphManager?.closeSession()
             glyphManager?.unInit()
@@ -271,10 +274,7 @@ object GlyphController {
 
             val builder = manager.getGlyphFrameBuilder()
             for (i in frame.segmentBrightness.indices) {
-                val b = frame.segmentBrightness[i]
-                if (b > 0) {
-                    builder.buildChannel(i, b)
-                }
+                builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
             }
             val hwFrame = builder.build()
             manager.toggle(hwFrame)
@@ -284,7 +284,7 @@ object GlyphController {
     }
 
     fun turnAllOn(brightness: Int = 255) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = false)
         val total = _activeDevice.value.totalSegments
         val array = IntArray(total) { brightness.coerceIn(0, 255) }
         updateFrame(GlyphFrame(segmentBrightness = array))
@@ -292,20 +292,17 @@ object GlyphController {
     }
 
     fun turnAllOff() {
-        stopAllAnimations()
-        clear()
+        stopAllAnimations(resetFrame = true)
         log("CMD", "ВЫКЛ ВСЕ")
     }
 
     fun setZoneState(zoneIndex: Int, enabled: Boolean, brightness: Int = 255) {
-        stopAllAnimations()
-        val current = _currentFrame.value.segmentBrightness.copyOf()
-        val channels: IntRange = when (zoneIndex) {
-            0 -> Phone3aProLayout.ZONE_A_CHANNELS // Top-Left (20..30)
-            1 -> Phone3aProLayout.ZONE_B_CHANNELS // Bottom-Left (31..35)
-            2 -> Phone3aProLayout.ZONE_C_CHANNELS // Right Arc (0..19)
-            else -> return
+        if (_activeAnimation.value != null) {
+            stopAllAnimations(resetFrame = false)
         }
+        val device = _activeDevice.value
+        val current = _currentFrame.value.segmentBrightness.copyOf()
+        val channels = getZoneChannels(device, zoneIndex)
         val b = if (enabled) brightness.coerceIn(0, 255) else 0
         for (ch in channels) {
             if (ch in current.indices) {
@@ -313,17 +310,14 @@ object GlyphController {
             }
         }
         updateFrame(GlyphFrame(segmentBrightness = current))
-        val zoneName = when (zoneIndex) {
-            0 -> "Дуга 1 (Верх-Лево, 11 LEDs)"
-            1 -> "Дуга 2 (Низ-Лево, 5 LEDs)"
-            2 -> "Дуга 3 (Справа, 20 LEDs)"
-            else -> "Зона $zoneIndex"
-        }
+        val zoneName = getZoneName(device, zoneIndex)
         log("CMD", "$zoneName -> ${if (enabled) "ВКЛ" else "ВЫКЛ"} (яркость $b)")
     }
 
     fun setSingleChannel(channelIndex: Int, brightness: Int = 255) {
-        stopAllAnimations()
+        if (_activeAnimation.value != null) {
+            stopAllAnimations(resetFrame = false)
+        }
         val total = _activeDevice.value.totalSegments
         val array = IntArray(total)
         if (channelIndex in 0 until total) {
@@ -370,7 +364,7 @@ object GlyphController {
     }
 
     fun switchDevice(device: NothingDevice) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = true)
         _activeDevice.value = device
         _detectedModel.value = "${device.displayName} [${device.deviceCode}]"
         log("CMD", "Переключение модели устройства: ${device.displayName} (${device.deviceCode})")
@@ -383,6 +377,110 @@ object GlyphController {
         }
     }
 
+    fun getZoneChannels(device: NothingDevice, zoneIndex: Int): IntArray {
+        return when (device) {
+            NothingDevice.PHONE_3A_PRO -> when (zoneIndex) {
+                0 -> (20..30).toList().toIntArray() // Top-Left Arc (11 LEDs)
+                1 -> (31..35).toList().toIntArray() // Bottom-Left Arc (5 LEDs)
+                2 -> (0..19).toList().toIntArray()  // Right Arc (20 LEDs)
+                else -> intArrayOf()
+            }
+            NothingDevice.PHONE_2A -> when (zoneIndex) {
+                0 -> intArrayOf(25)                 // Top-Left (1 LED)
+                1 -> intArrayOf(24)                 // Bottom-Left (1 LED)
+                2 -> (0..23).toList().toIntArray()  // Right Arc (24 LEDs)
+                else -> intArrayOf()
+            }
+            NothingDevice.PHONE_2 -> when (zoneIndex) {
+                0 -> intArrayOf(0, 1)               // Top Arcs
+                1 -> intArrayOf(2, 3, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32)
+                2 -> (4..19).toList().toIntArray()  // Progress Center Ring (16 LEDs)
+                else -> intArrayOf()
+            }
+            NothingDevice.PHONE_1 -> when (zoneIndex) {
+                0 -> (0..4).toList().toIntArray()   // Top Diagonal & Camera ring
+                1 -> (5..7).toList().toIntArray()   // Bottom Strip & Dot
+                2 -> (8..15).toList().toIntArray()  // Center C Ring
+                else -> intArrayOf()
+            }
+        }
+    }
+
+    fun getZoneName(device: NothingDevice, zoneIndex: Int): String {
+        return when (device) {
+            NothingDevice.PHONE_3A_PRO -> when (zoneIndex) {
+                0 -> "Дуга 1: Верх-Лево (11 LEDs, #20..30)"
+                1 -> "Дуга 2: Низ-Лево (5 LEDs, #31..35)"
+                2 -> "Дуга 3: Справа (20 LEDs, #0..19)"
+                else -> "Зона $zoneIndex"
+            }
+            NothingDevice.PHONE_2A -> when (zoneIndex) {
+                0 -> "Зона A: Верх-Лево (1 LED, #25)"
+                1 -> "Зона B: Низ-Лево (1 LED, #24)"
+                2 -> "Зона C: Справа (24 LEDs, #0..23)"
+                else -> "Зона $zoneIndex"
+            }
+            NothingDevice.PHONE_2 -> when (zoneIndex) {
+                0 -> "Верхние дуги (2 LEDs, #0..1)"
+                1 -> "Диагональ и низ (15 LEDs)"
+                2 -> "Центральное кольцо (16 LEDs, #4..19)"
+                else -> "Зона $zoneIndex"
+            }
+            NothingDevice.PHONE_1 -> when (zoneIndex) {
+                0 -> "Верхняя зона (5 LEDs)"
+                1 -> "Нижняя зона (3 LEDs)"
+                2 -> "Центральный круг (8 LEDs)"
+                else -> "Зона $zoneIndex"
+            }
+        }
+    }
+
+    fun getChannelZoneDescription(device: NothingDevice, channel: Int): String {
+        return when (device) {
+            NothingDevice.PHONE_3A_PRO -> when (channel) {
+                in 20..30 -> "Дуга 1 (Верх-Лево) #${channel - 20}"
+                in 31..35 -> "Дуга 2 (Низ-Лево) #${channel - 31}"
+                in 0..19 -> "Дуга 3 (Справа) #$channel"
+                else -> "Канал #$channel"
+            }
+            NothingDevice.PHONE_2A -> when (channel) {
+                25 -> "Зона A (Верх-Лево)"
+                24 -> "Зона B (Низ-Лево)"
+                in 0..23 -> "Зона C (Справа) #$channel"
+                else -> "Канал #$channel"
+            }
+            NothingDevice.PHONE_2 -> when (channel) {
+                in 0..1 -> "Верхняя дуга #$channel"
+                in 4..19 -> "Центральное кольцо #${channel - 4}"
+                else -> "Нижняя / диагональная зона #$channel"
+            }
+            NothingDevice.PHONE_1 -> when (channel) {
+                in 0..4 -> "Верхняя зона / камера #$channel"
+                in 5..7 -> "Нижняя полоса #$channel"
+                else -> "Центральный C-круг #$channel"
+            }
+        }
+    }
+
+    fun getCircularSequence(device: NothingDevice): IntArray {
+        return when (device) {
+            NothingDevice.PHONE_3A_PRO -> intArrayOf(
+                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, // Top-Left Arc
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, // Right Arc
+                31, 32, 33, 34, 35 // Bottom-Left Arc
+            )
+            NothingDevice.PHONE_2A -> intArrayOf(
+                25, // Top-Left
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, // Right Arc
+                24 // Bottom-Left
+            )
+            NothingDevice.PHONE_2 -> intArrayOf(
+                0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 2, 3, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+            )
+            NothingDevice.PHONE_1 -> (0 until 16).toList().toIntArray()
+        }
+    }
+
     fun animateHardwareFrame(frame: GlyphFrame, durationMs: Int = 300) {
         _currentFrame.value = frame
 
@@ -392,20 +490,22 @@ object GlyphController {
         try {
             val builder = manager.getGlyphFrameBuilder()
             for (i in frame.segmentBrightness.indices) {
-                val b = frame.segmentBrightness[i]
-                if (b > 0) {
-                    builder.buildChannel(i, b)
-                }
+                builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
             }
+            try {
+                builder.buildPeriod(durationMs)
+                builder.buildInterval(10)
+                builder.buildCycles(1)
+            } catch (ignored: Throwable) {}
             val hwFrame = builder.build()
 
             var animated = false
             try {
-                val method = manager.javaClass.methods.firstOrNull { it.name == "animate" && it.parameterTypes.size == 2 }
+                val method = manager.javaClass.methods.firstOrNull { it.name == "animate" && it.parameterTypes.size == 1 }
                 if (method != null) {
-                    method.invoke(manager, hwFrame, durationMs)
+                    method.invoke(manager, hwFrame)
                     animated = true
-                    log("CMD", "mGM.animate($durationMs ms)")
+                    log("CMD", "mGM.animate (длительность ${durationMs}мс)")
                 }
             } catch (ignored: Throwable) {}
 
@@ -442,7 +542,7 @@ object GlyphController {
     // ==========================================
 
     fun startStrobe(scope: CoroutineScope, frequencyHz: Int = 10) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "STROBE"
         val halfPeriodMs = (1000L / (frequencyHz * 2)).coerceAtLeast(25L)
         log("CMD", "⚡ Старт стробоскопа: $frequencyHz Гц (пульсация каждые ${halfPeriodMs}мс)")
@@ -462,13 +562,13 @@ object GlyphController {
 
     fun stopStrobe() {
         if (_activeAnimation.value == "STROBE") {
-            stopAllAnimations()
+            stopAllAnimations(resetFrame = true)
             log("CMD", "⚡ Стробоскоп остановлен")
         }
     }
 
     fun startSmoothBreathing(scope: CoroutineScope) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "BREATHING"
         log("CMD", "🌊 Старт плавного дыхания (синусоидальное свечение)")
 
@@ -477,10 +577,11 @@ object GlyphController {
             var angle = 0.0
             while (isActive) {
                 val norm = (sin(angle) + 1.0) / 2.0 // 0.0 .. 1.0
-                val brightness = (norm * 255).toInt().coerceIn(0, 255)
+                // Keep minimal floor at 2 to avoid PWM turnOff flickers during breathing
+                val brightness = (norm * 253.0 + 2.0).toInt().coerceIn(2, 255)
                 val array = IntArray(total) { brightness }
                 updateFrame(GlyphFrame(segmentBrightness = array))
-                angle += 0.08
+                angle += 0.07
                 delay(20L)
             }
         }
@@ -488,47 +589,61 @@ object GlyphController {
 
     fun stopSmoothBreathing() {
         if (_activeAnimation.value == "BREATHING") {
-            stopAllAnimations()
+            stopAllAnimations(resetFrame = true)
             log("CMD", "🌊 Плавное дыхание остановлено")
         }
     }
 
     fun startBottleRoulette(scope: CoroutineScope, onStop: ((Int) -> Unit)? = null) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "BOTTLE"
-        log("CMD", "🍾 Старт «Световой бутылочки» (круговое вращение с физикой трения)")
+        val seq = getCircularSequence(_activeDevice.value)
+        log("CMD", "🍾 Старт «Световой бутылочки» (${seq.size} светодиодов, круговое вращение)")
 
         animationJob = scope.launch(Dispatchers.Default) {
-            val total = _activeDevice.value.totalSegments
-            var currentPos = Random.nextInt(total)
+            var seqIdx = Random.nextInt(seq.size)
             val totalSteps = 45 + Random.nextInt(25)
             var currentDelayMs = 25L
 
             for (step in 0 until totalSteps) {
                 if (!isActive) break
-                currentPos = (currentPos + 1) % total
-                setSinglePixel(currentPos, brightness = 255, trailFade = true)
+                seqIdx = (seqIdx + 1) % seq.size
+                val currentChannel = seq[seqIdx]
+                val prevChannel1 = seq[(seqIdx - 1 + seq.size) % seq.size]
+                val prevChannel2 = seq[(seqIdx - 2 + seq.size) % seq.size]
+
+                val total = _activeDevice.value.totalSegments
+                val array = IntArray(total)
+                if (currentChannel in array.indices) array[currentChannel] = 255
+                if (prevChannel1 in array.indices) array[prevChannel1] = 90
+                if (prevChannel2 in array.indices) array[prevChannel2] = 25
+                updateFrame(GlyphFrame(segmentBrightness = array))
 
                 val progress = step.toFloat() / totalSteps.toFloat()
-                if (progress > 0.45f) {
-                    // Physics friction deceleration
-                    currentDelayMs = (25L + (progress * progress * 320L)).toLong()
+                if (progress > 0.40f) {
+                    val f = (progress - 0.40f) / 0.60f
+                    currentDelayMs = (25L + (f * f * 340L)).toLong()
                 }
                 delay(currentDelayMs)
             }
 
-            val winner = currentPos
-            log("SUCCESS", "🍾 Световая бутылочка остановилась: сегмент #$winner")
+            val winner = seq[seqIdx]
+            log("SUCCESS", "🍾 Световая бутылочка остановилась: светодиод #$winner")
 
             // Victory pulse
+            val total = _activeDevice.value.totalSegments
             for (i in 0 until 4) {
                 if (!isActive) break
-                setSinglePixel(winner, brightness = 255, trailFade = false)
+                val winArray = IntArray(total)
+                if (winner in winArray.indices) winArray[winner] = 255
+                updateFrame(GlyphFrame(segmentBrightness = winArray))
                 delay(150L)
-                clear()
+                updateFrame(GlyphFrame(segmentBrightness = IntArray(total)))
                 delay(120L)
             }
-            setSinglePixel(winner, brightness = 255, trailFade = false)
+            val finalArray = IntArray(total)
+            if (winner in finalArray.indices) finalArray[winner] = 255
+            updateFrame(GlyphFrame(segmentBrightness = finalArray))
             _activeAnimation.value = null
             onStop?.invoke(winner)
         }
@@ -536,22 +651,26 @@ object GlyphController {
 
     fun stopBottleRoulette() {
         if (_activeAnimation.value == "BOTTLE") {
-            stopAllAnimations()
+            stopAllAnimations(resetFrame = true)
             log("CMD", "🍾 Световая бутылочка остановлена")
         }
     }
 
     fun startAutoWalk(scope: CoroutineScope, intervalMs: Long = 100L) {
-        stopAllAnimations()
+        stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "AUTO_WALK"
-        log("CMD", "▶ Старт авто-обхода (бегущий свет по всем 36 светодиодам)")
+        val seq = getCircularSequence(_activeDevice.value)
+        log("CMD", "▶ Старт авто-обхода (${seq.size} светодиодов по кругу)")
 
         animationJob = scope.launch(Dispatchers.Default) {
+            var step = 0
             val total = _activeDevice.value.totalSegments
-            var pos = 0
             while (isActive) {
-                setSinglePixel(pos, brightness = 255, trailFade = false)
-                pos = (pos + 1) % total
+                val ch = seq[step % seq.size]
+                val array = IntArray(total)
+                if (ch in array.indices) array[ch] = 255
+                updateFrame(GlyphFrame(segmentBrightness = array))
+                step++
                 delay(intervalMs)
             }
         }
@@ -559,15 +678,17 @@ object GlyphController {
 
     fun stopAutoWalk() {
         if (_activeAnimation.value == "AUTO_WALK") {
-            stopAllAnimations()
+            stopAllAnimations(resetFrame = true)
             log("CMD", "▶ Авто-обход остановлен")
         }
     }
 
-    fun stopAllAnimations() {
+    fun stopAllAnimations(resetFrame: Boolean = true) {
         animationJob?.cancel()
         animationJob = null
         _activeAnimation.value = null
-        clear()
+        if (resetFrame) {
+            clear()
+        }
     }
 }
