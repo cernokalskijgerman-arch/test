@@ -17,6 +17,7 @@ app/build/
 *.aab
 
 # OS & Temporary
+tools/
 .DS_Store
 Thumbs.db
 *.log
