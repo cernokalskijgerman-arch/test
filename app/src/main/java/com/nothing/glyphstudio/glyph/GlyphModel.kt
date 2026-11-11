@@ -1,7 +1,10 @@
 package com.nothing.glyphstudio.glyph
 
+import com.nothing.ketchum.Glyph
+
 /**
  * Supported Nothing Phone models and their Glyph matrix architecture according to official Nothing Ketchum SDK.
+ * Note: Ketchum SDK device codes match hardware model identifiers ("A059", "A142", "A065", "A063").
  */
 enum class NothingDevice(
     val deviceCode: String,
@@ -11,28 +14,28 @@ enum class NothingDevice(
     val description: String
 ) {
     PHONE_3A_PRO(
-        deviceCode = "24111",
+        deviceCode = Glyph.DEVICE_24111, // "A059" (Nothing Phone 3a / 3a Pro / 3)
         displayName = "Nothing Phone (3a Pro / 3)",
         zoneCount = 3,
         totalSegments = 36,
         description = "3 curved arcs around camera: Top-Left (11 LEDs), Bottom-Left (5 LEDs), Right (20 LEDs)"
     ),
     PHONE_2A(
-        deviceCode = "23111",
+        deviceCode = Glyph.DEVICE_23111, // "A142" (Nothing Phone 2a)
         displayName = "Nothing Phone (2a)",
         zoneCount = 3,
         totalSegments = 26,
         description = "3 zones: Top-Left (1 LED), Bottom-Left (1 LED), Right (24 LEDs)"
     ),
     PHONE_2(
-        deviceCode = "22111",
+        deviceCode = Glyph.DEVICE_22111, // "A065" (Nothing Phone 2)
         displayName = "Nothing Phone (2)",
         zoneCount = 11,
         totalSegments = 33,
         description = "11 zones with 16-segment center progress ring"
     ),
     PHONE_1(
-        deviceCode = "20111",
+        deviceCode = Glyph.DEVICE_20111, // "A063" (Nothing Phone 1)
         displayName = "Nothing Phone (1)",
         zoneCount = 5,
         totalSegments = 16,

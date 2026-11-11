@@ -37,6 +37,7 @@
         <!-- Nothing Developer Key (use 'test' for development / debug builds) -->
         <meta-data android:name="NothingKey" android:value="test" />
         <meta-data android:name="targetNothingSDKVersion" android:value="140101" />
+        <meta-data android:name="TargetDevice" android:value="A059" />
 
         <activity
             android:name=".MainActivity"

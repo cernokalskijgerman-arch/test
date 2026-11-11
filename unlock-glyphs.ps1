@@ -60,12 +60,28 @@ if ($val -eq "1") {
 }
 
 Write-Host ""
-Write-Host "ШАГ 3: УСТАНОВКА ТЕСТОВОГО APK НА СМАРТФОН..." -ForegroundColor Yellow
+Write-Host "ШАГ 3: ОБНОВЛЕНИЕ И УСТАНОВКА ТЕСТОВОГО APK НА СМАРТФОН..." -ForegroundColor Yellow
+
+$downloadLatest = $true
+$releaseUrl = "https://github.com/cernokalskijgerman-arch/test/releases/latest/download/NothingGlyphStudio-debug.apk"
+Write-Host "Проверка и загрузка свежей сборки APK с GitHub Releases..." -ForegroundColor White
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $releaseUrl -OutFile $apkPath -UseBasicParsing -TimeoutSec 30
+    Write-Host "[+] Самый свежий APK успешно скачан с GitHub!" -ForegroundColor Green
+} catch {
+    if (Test-Path $apkPath) {
+        Write-Host "[-] Не удалось обновить из сети (возможно сборка GitHub Actions еще идет). Используем локальный APK." -ForegroundColor Gray
+    } else {
+        Write-Host "[!] Файл APK не найден ни локально, ни на GitHub." -ForegroundColor Red
+    }
+}
+
 if (Test-Path $apkPath) {
     Write-Host "Удаление старой конфликтующей версии (если была)..." -ForegroundColor Gray
     & $adbPath uninstall com.nothing.glyphstudio 2>$null | Out-Null
     
-    Write-Host "Установка NothingGlyphStudio-debug.apk на телефон..." -ForegroundColor White
+    Write-Host "Установка NothingGlyphStudio-debug.apk на телефон через ADB..." -ForegroundColor White
     $installResult = & $adbPath install -r -d $apkPath
     Write-Host $installResult -ForegroundColor Cyan
     

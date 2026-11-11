@@ -22,12 +22,21 @@ export default function LiquidGlassCard({
         style,
       ]}
     >
-      {/* Native frosted backdrop */}
-      <BlurView
-        intensity={intensity}
-        tint="dark"
-        style={StyleSheet.absoluteFill}
-      />
+      {/* Frosted glass backdrop - safe for Expo Go on Android */}
+      {Platform.OS === 'ios' ? (
+        <BlurView
+          intensity={intensity}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+      ) : (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(18, 18, 24, 0.82)' }
+          ]}
+        />
+      )}
 
       {/* iOS Liquid Glass specular refraction sheen */}
       <LinearGradient

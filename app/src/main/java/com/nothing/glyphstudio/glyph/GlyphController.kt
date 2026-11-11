@@ -200,6 +200,17 @@ object GlyphController {
             }
 
             if (!registered) {
+                // If specific hardware code failed, try registering with Build.MODEL
+                log("WARN", "Попытка register('${Build.MODEL}')...")
+                try {
+                    registered = manager.register(Build.MODEL)
+                    log("INFO", "Результат mGM.register('${Build.MODEL}'): $registered")
+                } catch (e: Throwable) {
+                    log("WARN", "mGM.register('${Build.MODEL}') выбросил: ${e.message}")
+                }
+            }
+
+            if (!registered) {
                 log("WARN", "Попытка register() без параметров...")
                 try {
                     registered = manager.register()
@@ -272,9 +283,37 @@ object GlyphController {
                 return
             }
 
-            val builder = manager.getGlyphFrameBuilder()
+            val targetDeviceCode = _activeDevice.value.deviceCode
+            val builder = try {
+                com.nothing.ketchum.GlyphFrame.Builder(targetDeviceCode)
+            } catch (e: Throwable) {
+                manager.getGlyphFrameBuilder()
+            }
+
+            // Defensive reflection check: verify channel list capacity and dynamically expand if necessary
+            val channelList = try {
+                val f = builder.javaClass.getDeclaredField("channel").apply { isAccessible = true }
+                @Suppress("UNCHECKED_CAST")
+                f.get(builder) as? java.util.ArrayList<Int?>
+            } catch (e: Throwable) {
+                null
+            }
+
+            if (channelList != null && channelList.size < frame.segmentBrightness.size) {
+                while (channelList.size < frame.segmentBrightness.size) {
+                    channelList.add(0)
+                }
+            }
+
+            val maxChannels = channelList?.size ?: frame.segmentBrightness.size
             for (i in frame.segmentBrightness.indices) {
-                builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
+                if (i < maxChannels) {
+                    try {
+                        builder.buildChannel(i, frame.segmentBrightness[i].coerceIn(0, 255))
+                    } catch (e: Throwable) {
+                        log("WARN", "buildChannel($i) failed: ${e.message}")
+                    }
+                }
             }
             val hwFrame = builder.build()
             manager.toggle(hwFrame)
