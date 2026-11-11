@@ -249,7 +249,7 @@ object GlyphController {
                 return
             }
 
-            val builder = manager.glyphFrameBuilder
+            val builder = manager.getGlyphFrameBuilder()
             for (i in frame.segmentBrightness.indices) {
                 val b = frame.segmentBrightness[i]
                 if (b > 0) {

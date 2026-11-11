@@ -26,12 +26,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
@@ -451,17 +445,18 @@ fun GlyphTestScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            selectedChannel = ((selectedChannel - 1) % totalSegments + totalSegments) % totalSegments
-                            GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
-                        },
+                    Box(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF222228))
+                            .clickable {
+                                selectedChannel = ((selectedChannel - 1) % totalSegments + totalSegments) % totalSegments
+                                GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ChevronLeft, "Назад", tint = Color.White)
+                        Text("◀", color = Color.White, fontSize = 14.sp)
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -486,17 +481,18 @@ fun GlyphTestScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = {
-                            selectedChannel = (selectedChannel + 1) % totalSegments
-                            GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
-                        },
+                    Box(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF222228))
+                            .clickable {
+                                selectedChannel = (selectedChannel + 1) % totalSegments
+                                GlyphController.setSingleChannel(selectedChannel, masterBrightness.toInt())
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.ChevronRight, "Вперед", tint = Color.White)
+                        Text("▶", color = Color.White, fontSize = 14.sp)
                     }
                 }
 
@@ -636,36 +632,40 @@ fun GlyphTestScreen(
                         )
                     }
 
-                    Row {
-                        IconButton(
-                            onClick = {
-                                val text = diagnosticLogs.joinToString("\n") { "[${it.timestamp}] [${it.level}] ${it.message}" }
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("GlyphDiagnostics", text))
-                                Toast.makeText(context, "Логи скопированы в буфер!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.size(28.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0x22FFFFFF))
+                                .clickable {
+                                    val text = diagnosticLogs.joinToString("\n") { "[${it.timestamp}] [${it.level}] ${it.message}" }
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("GlyphDiagnostics", text))
+                                    Toast.makeText(context, "Логи скопированы в буфер!", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, "Копировать", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Text("КОПИР.", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                         }
 
-                        IconButton(
-                            onClick = { GlyphController.clearLogs() },
-                            modifier = Modifier.size(28.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0x22FFFFFF))
+                                .clickable { GlyphController.clearLogs() }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
                         ) {
-                            Icon(Icons.Default.DeleteSweep, "Очистить", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Text("ОЧИСТ.", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                         }
 
-                        IconButton(
-                            onClick = { isLogsExpanded = !isLogsExpanded },
-                            modifier = Modifier.size(28.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0x22FFFFFF))
+                                .clickable { isLogsExpanded = !isLogsExpanded }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
                         ) {
-                            Icon(
-                                imageVector = if (isLogsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Развернуть",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Text(if (isLogsExpanded) "▲" else "▼", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }

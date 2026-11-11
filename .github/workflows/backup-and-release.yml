@@ -30,6 +30,15 @@ jobs:
       - name: Build Debug APK with Gradle
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
+      - name: Upload Build Reports on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-failure-reports
+          path: |
+            app/build/reports/
+          retention-days: 7
+
       - name: Prepare APK for Release
         run: |
           mkdir -p release-apk
