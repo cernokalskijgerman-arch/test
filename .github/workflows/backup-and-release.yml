@@ -28,15 +28,24 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK with Gradle
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
 
-      - name: Upload Build Reports on Failure
+      - name: Output Build Failure to Summary
+        if: failure()
+        run: |
+          echo "### ❌ Gradle Build Failure Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Build Log on Failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-build-failure-reports
-          path: |
-            app/build/reports/
+          name: gradle-build-log
+          path: gradle-build.log
           retention-days: 7
 
       - name: Prepare APK for Release
