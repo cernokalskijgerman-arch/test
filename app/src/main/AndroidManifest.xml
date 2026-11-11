@@ -15,6 +15,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Nothing OS Package Visibility queries for IPC Service Binding -->
+    <queries>
+        <package android:name="com.nothing.thirdparty" />
+        <intent>
+            <action android:name="com.nothing.thirdparty.bind_glyphservice" />
+        </intent>
+    </queries>
+
     <application
         android:name=".GlyphStudioApp"
         android:allowBackup="true"
@@ -28,6 +36,7 @@
 
         <!-- Nothing Developer Key (use 'test' for development / debug builds) -->
         <meta-data android:name="NothingKey" android:value="test" />
+        <meta-data android:name="targetNothingSDKVersion" android:value="140101" />
 
         <activity
             android:name=".MainActivity"

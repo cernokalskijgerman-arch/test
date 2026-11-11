@@ -1,27 +1,38 @@
 package com.nothing.glyphstudio.glyph
 
 /**
- * Supported Nothing Phone models and their Glyph matrix architecture.
+ * Supported Nothing Phone models and their Glyph matrix architecture according to official Nothing Ketchum SDK.
  */
 enum class NothingDevice(
+    val deviceCode: String,
     val displayName: String,
     val zoneCount: Int,
     val totalSegments: Int,
     val description: String
 ) {
     PHONE_3A_PRO(
+        deviceCode = "24111",
         displayName = "Nothing Phone (3a Pro / 3)",
         zoneCount = 3,
-        totalSegments = 33,
-        description = "3 curved arcs around circular camera: Top-Left (12 LEDs), Bottom-Left (6 LEDs), Right (15 LEDs)"
+        totalSegments = 36,
+        description = "3 curved arcs around camera: Top-Left (11 LEDs), Bottom-Left (5 LEDs), Right (20 LEDs)"
+    ),
+    PHONE_2A(
+        deviceCode = "23111",
+        displayName = "Nothing Phone (2a)",
+        zoneCount = 3,
+        totalSegments = 26,
+        description = "3 zones: Top-Left (1 LED), Bottom-Left (1 LED), Right (24 LEDs)"
     ),
     PHONE_2(
+        deviceCode = "22111",
         displayName = "Nothing Phone (2)",
         zoneCount = 11,
         totalSegments = 33,
         description = "11 zones with 16-segment center progress ring"
     ),
     PHONE_1(
+        deviceCode = "20111",
         displayName = "Nothing Phone (1)",
         zoneCount = 5,
         totalSegments = 16,
@@ -36,29 +47,33 @@ data class GlyphChannel(
 )
 
 /**
- * Layout mapping for Nothing Phone (3a Pro / 3) circular camera module.
+ * Layout mapping for Nothing Phone (3a Pro / 3, DEVICE_24111) circular camera module.
+ * Direct Ketchum mapping:
+ * - Zone C (Right Arc): channels 0..19 (20 LEDs)
+ * - Zone A (Top-Left Arc): channels 20..30 (11 LEDs)
+ * - Zone B (Bottom-Left Arc): channels 31..35 (5 LEDs)
  */
 object Phone3aProLayout {
-    const val ZONE_TOP_LEFT = 0     // Indices 0..11 (12 individual micro-LEDs)
-    const val ZONE_BOTTOM_LEFT = 1  // Indices 12..17 (6 individual micro-LEDs)
-    const val ZONE_RIGHT = 2        // Indices 18..32 (15 individual micro-LEDs)
+    const val COUNT_RIGHT = 20
+    const val COUNT_TOP_LEFT = 11
+    const val COUNT_BOTTOM_LEFT = 5
+    const val TOTAL_LEDS = 36
 
-    const val COUNT_TOP_LEFT = 12
-    const val COUNT_BOTTOM_LEFT = 6
-    const val COUNT_RIGHT = 15
-    const val TOTAL_LEDS = 33
+    val ZONE_A_CHANNELS = 20..30 // Top-Left Arc
+    val ZONE_B_CHANNELS = 31..35 // Bottom-Left Arc
+    val ZONE_C_CHANNELS = 0..19  // Right Arc
 
     val CHANNELS: List<GlyphChannel> = buildList {
+        for (i in 0 until COUNT_RIGHT) {
+            add(GlyphChannel(id = i, zoneName = "Правая дуга #$i (Zone C)", segmentIndex = i))
+        }
         for (i in 0 until COUNT_TOP_LEFT) {
-            add(GlyphChannel(id = i, zoneName = "Top-Left Arc #$i", segmentIndex = i))
+            val idx = 20 + i
+            add(GlyphChannel(id = idx, zoneName = "Верх-Лево #$i (Zone A)", segmentIndex = idx))
         }
         for (i in 0 until COUNT_BOTTOM_LEFT) {
-            val idx = COUNT_TOP_LEFT + i
-            add(GlyphChannel(id = idx, zoneName = "Bottom-Left Arc #$i", segmentIndex = idx))
-        }
-        for (i in 0 until COUNT_RIGHT) {
-            val idx = COUNT_TOP_LEFT + COUNT_BOTTOM_LEFT + i
-            add(GlyphChannel(id = idx, zoneName = "Right Arc #$i", segmentIndex = idx))
+            val idx = 31 + i
+            add(GlyphChannel(id = idx, zoneName = "Низ-Лево #$i (Zone B)", segmentIndex = idx))
         }
     }
 }

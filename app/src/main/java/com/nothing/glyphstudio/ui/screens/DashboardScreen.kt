@@ -144,6 +144,7 @@ fun DashboardScreen(
                         Text(
                             text = when (device) {
                                 NothingDevice.PHONE_3A_PRO -> "3A PRO / 3"
+                                NothingDevice.PHONE_2A -> "PHONE (2A)"
                                 NothingDevice.PHONE_2 -> "PHONE (2)"
                                 NothingDevice.PHONE_1 -> "PHONE (1)"
                             },

@@ -42,6 +42,7 @@ import com.nothing.glyphstudio.theme.GlyphStudioTheme
 import com.nothing.glyphstudio.theme.liquidGlass
 import com.nothing.glyphstudio.ui.screens.ArcadeScreen
 import com.nothing.glyphstudio.ui.screens.DashboardScreen
+import com.nothing.glyphstudio.ui.screens.GlyphTestScreen
 import com.nothing.glyphstudio.ui.screens.ScreenDestination
 import com.nothing.glyphstudio.ui.screens.SequencerScreen
 import com.nothing.glyphstudio.ui.screens.UtilitiesScreen
@@ -64,10 +65,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = GlyphColors.AmoledBlack
                 ) {
-                    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 5 })
+                    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 6 })
                     val scope = rememberCoroutineScope()
 
-                    val tabTitles = listOf("ХАБ", "СЕКВЕНСОР", "МУЗЫКА", "УТИЛИТЫ", "ИГРЫ")
+                    val tabTitles = listOf("ТЕСТ", "ХАБ", "СЕКВЕНСОР", "МУЗЫКА", "УТИЛИТЫ", "ИГРЫ")
 
                     Column(modifier = Modifier.fillMaxSize()) {
                         // Top Swipe Navigation Bar in Ultra Liquid Glass
@@ -115,28 +116,33 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxWidth()
                         ) { page ->
                             when (page) {
-                                0 -> DashboardScreen(
+                                0 -> GlyphTestScreen(
+                                    onNavigateFullApp = {
+                                        scope.launch { pagerState.animateScrollToPage(1) }
+                                    }
+                                )
+                                1 -> DashboardScreen(
                                     onNavigate = { dest ->
                                         val targetPage = when (dest) {
-                                            ScreenDestination.DASHBOARD -> 0
-                                            ScreenDestination.SEQUENCER -> 1
-                                            ScreenDestination.VISUALIZER -> 2
-                                            ScreenDestination.UTILITIES -> 3
-                                            ScreenDestination.ARCADE -> 4
+                                            ScreenDestination.DASHBOARD -> 1
+                                            ScreenDestination.SEQUENCER -> 2
+                                            ScreenDestination.VISUALIZER -> 3
+                                            ScreenDestination.UTILITIES -> 4
+                                            ScreenDestination.ARCADE -> 5
                                         }
                                         scope.launch { pagerState.animateScrollToPage(targetPage) }
                                     }
                                 )
-                                1 -> SequencerScreen(
+                                2 -> SequencerScreen(
                                     onBack = { scope.launch { pagerState.animateScrollToPage(0) } }
                                 )
-                                2 -> VisualizerScreen(
+                                3 -> VisualizerScreen(
                                     onBack = { scope.launch { pagerState.animateScrollToPage(0) } }
                                 )
-                                3 -> UtilitiesScreen(
+                                4 -> UtilitiesScreen(
                                     onBack = { scope.launch { pagerState.animateScrollToPage(0) } }
                                 )
-                                4 -> ArcadeScreen(
+                                5 -> ArcadeScreen(
                                     onBack = { scope.launch { pagerState.animateScrollToPage(0) } }
                                 )
                             }

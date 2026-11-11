@@ -67,7 +67,7 @@ fun GlyphSimulatorView(
 
             // 3. Draw Glyphs
             when (activeDevice) {
-                NothingDevice.PHONE_3A_PRO -> {
+                NothingDevice.PHONE_3A_PRO, NothingDevice.PHONE_2A -> {
                     drawPhone3aProGlyphs(w, h, currentFrame.segmentBrightness)
                 }
                 NothingDevice.PHONE_2 -> {
@@ -266,7 +266,7 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
     )
 
     // -------------------------------------------------------------
-    // ARC 1: TOP-LEFT ARC (12 micro-LEDs)
+    // ARC 1: TOP-LEFT ARC (11 micro-LEDs) - Ketchum Zone A: channels 20..30
     // Runs along upper-left quadrant from angle 198° to 239°
     // -------------------------------------------------------------
     val arc1Count = Phone3aProLayout.COUNT_TOP_LEFT
@@ -281,12 +281,13 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
             (cx + glyphR * cos(rad)).toFloat(),
             (cy + glyphR * sin(rad)).toFloat()
         )
-        val b = if (i < brightness.size) brightness[i] else 0
+        val channelIdx = 20 + i
+        val b = if (channelIdx < brightness.size) brightness[channelIdx] else 0
         drawDiscreteLedDot(ledCenter, b, radius = 4.2.dp.toPx())
     }
 
     // -------------------------------------------------------------
-    // ARC 2: BOTTOM-LEFT ARC (6 micro-LEDs)
+    // ARC 2: BOTTOM-LEFT ARC (5 micro-LEDs) - Ketchum Zone B: channels 31..35
     // Runs along bottom-left quadrant from angle 134° to 155°
     // -------------------------------------------------------------
     val arc2Count = Phone3aProLayout.COUNT_BOTTOM_LEFT
@@ -295,19 +296,19 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
     val arc2Step = (arc2End - arc2Start) / (arc2Count - 1)
 
     for (i in 0 until arc2Count) {
-        val globalIdx = arc1Count + i
         val angleDeg = arc2Start + i * arc2Step
         val rad = angleDeg * (PI / 180.0)
         val ledCenter = Offset(
             (cx + glyphR * cos(rad)).toFloat(),
             (cy + glyphR * sin(rad)).toFloat()
         )
-        val b = if (globalIdx < brightness.size) brightness[globalIdx] else 0
+        val channelIdx = 31 + i
+        val b = if (channelIdx < brightness.size) brightness[channelIdx] else 0
         drawDiscreteLedDot(ledCenter, b, radius = 4.2.dp.toPx())
     }
 
     // -------------------------------------------------------------
-    // ARC 3: RIGHT VERTICAL ARC (15 micro-LEDs)
+    // ARC 3: RIGHT VERTICAL ARC (20 micro-LEDs) - Ketchum Zone C: channels 0..19
     // Runs vertically along entire right side from angle -16° (344°) to 32°
     // -------------------------------------------------------------
     val arc3Count = Phone3aProLayout.COUNT_RIGHT
@@ -316,14 +317,14 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
     val arc3Step = (arc3End - arc3Start) / (arc3Count - 1)
 
     for (i in 0 until arc3Count) {
-        val globalIdx = arc1Count + arc2Count + i
+        val channelIdx = i
         val angleDeg = arc3Start + i * arc3Step
         val rad = angleDeg * (PI / 180.0)
         val ledCenter = Offset(
             (cx + glyphR * cos(rad)).toFloat(),
             (cy + glyphR * sin(rad)).toFloat()
         )
-        val b = if (globalIdx < brightness.size) brightness[globalIdx] else 0
+        val b = if (channelIdx < brightness.size) brightness[channelIdx] else 0
         drawDiscreteLedDot(ledCenter, b, radius = 4.2.dp.toPx())
     }
 }

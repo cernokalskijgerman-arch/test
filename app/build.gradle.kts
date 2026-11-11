@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nothing.glyphstudio"
-        minSdk = 29
+        minSdk = 33
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
@@ -68,7 +68,8 @@ dependencies {
     // JSON serialization for .glyph files
     implementation("com.google.code.gson:gson:2.11.0")
 
-    // Official Nothing Glyph Developer Kit is provided by Nothing OS runtime via reflection in GlyphController.kt
+    // Official Nothing Glyph Developer Kit SDK 2.0 (classes for Nothing Ketchum & IGlyphService)
+    implementation(files("libs/glyph-matrix-sdk-2.0.jar"))
 
 
     debugImplementation("androidx.compose.ui:ui-tooling")

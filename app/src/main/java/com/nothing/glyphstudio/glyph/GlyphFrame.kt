@@ -9,7 +9,7 @@ import com.google.gson.GsonBuilder
  */
 data class GlyphFrame(
     val timestampMs: Long = System.currentTimeMillis(),
-    val segmentBrightness: IntArray = IntArray(33)
+    val segmentBrightness: IntArray = IntArray(36)
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
