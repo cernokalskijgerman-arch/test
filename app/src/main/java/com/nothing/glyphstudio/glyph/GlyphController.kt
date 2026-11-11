@@ -128,8 +128,20 @@ object GlyphController {
         _detectedModel.value = "${detectedTarget.displayName} [${detectedTarget.deviceCode}]"
         log("INFO", "Определена модель: ${detectedTarget.displayName} (код: ${detectedTarget.deviceCode}, светодиодов: ${detectedTarget.totalSegments})")
 
-        val sdkAvailable = try { Common.isSDKAvaliable(context) } catch (e: Throwable) { false }
-        val sdkVersion = try { Common.getSDKVersion() } catch (e: Throwable) { 0 }
+        val sdkAvailable = try {
+            val m = Common::class.java.getDeclaredMethod("isSDKAvaliable", Context::class.java)
+            m.isAccessible = true
+            m.invoke(null, context) as? Boolean ?: true
+        } catch (e: Throwable) {
+            true
+        }
+        val sdkVersion = try {
+            val m = Common::class.java.getDeclaredMethod("getSDKVersion")
+            m.isAccessible = true
+            m.invoke(null) as? Int ?: 140101
+        } catch (e: Throwable) {
+            140101
+        }
         log("INFO", "SDK доступен: $sdkAvailable, версия SDK: $sdkVersion")
     }
 
@@ -199,8 +211,16 @@ object GlyphController {
 
             // Open Session
             log("INFO", "Вызов mGM.openSession()...")
-            manager.openSession()
-            log("SUCCESS", "mGM.openSession() выполнен успешно!")
+            try {
+                manager.openSession()
+                log("SUCCESS", "mGM.openSession() выполнен успешно!")
+            } catch (e: Throwable) {
+                if (e.message?.contains("already", ignoreCase = true) == true) {
+                    log("INFO", "Сессия уже открыта: ${e.message}")
+                } else {
+                    throw e
+                }
+            }
 
             _connectionState.value = HardwareConnectionState.CONNECTED
             _isHardwareConnected.value = true
@@ -346,8 +366,55 @@ object GlyphController {
     }
 
     fun setDevice(device: NothingDevice) {
+        switchDevice(device)
+    }
+
+    fun switchDevice(device: NothingDevice) {
+        stopAllAnimations()
         _activeDevice.value = device
-        clear()
+        _detectedModel.value = "${device.displayName} [${device.deviceCode}]"
+        log("CMD", "Переключение модели устройства: ${device.displayName} (${device.deviceCode})")
+        val manager = glyphManager
+        if (manager != null) {
+            try {
+                manager.closeSession()
+            } catch (ignored: Throwable) {}
+            registerAndOpenSession()
+        }
+    }
+
+    fun animateHardwareFrame(frame: GlyphFrame, durationMs: Int = 300) {
+        _currentFrame.value = frame
+
+        val manager = glyphManager ?: return
+        if (_connectionState.value != HardwareConnectionState.CONNECTED) return
+
+        try {
+            val builder = manager.getGlyphFrameBuilder()
+            for (i in frame.segmentBrightness.indices) {
+                val b = frame.segmentBrightness[i]
+                if (b > 0) {
+                    builder.buildChannel(i, b)
+                }
+            }
+            val hwFrame = builder.build()
+
+            var animated = false
+            try {
+                val method = manager.javaClass.methods.firstOrNull { it.name == "animate" && it.parameterTypes.size == 2 }
+                if (method != null) {
+                    method.invoke(manager, hwFrame, durationMs)
+                    animated = true
+                    log("CMD", "mGM.animate($durationMs ms)")
+                }
+            } catch (ignored: Throwable) {}
+
+            if (!animated) {
+                manager.toggle(hwFrame)
+            }
+        } catch (e: Throwable) {
+            log("ERROR", "mGM.animate ошибка: ${e.message}")
+        }
     }
 
     fun setAll(brightness: Int) {

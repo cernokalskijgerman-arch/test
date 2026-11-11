@@ -40,17 +40,6 @@ jobs:
           tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Push Build Failure Log to Branch
-        if: failure()
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git checkout -b build-log
-          cp gradle-build.log last-build-failure.log
-          git add last-build-failure.log
-          git commit -m "chore: save build failure log [skip ci]"
-          git push -f origin build-log
-
       - name: Upload Build Log on Failure
         if: failure()
         uses: actions/upload-artifact@v4

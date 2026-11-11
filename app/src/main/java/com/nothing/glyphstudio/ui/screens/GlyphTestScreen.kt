@@ -71,6 +71,7 @@ fun GlyphTestScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val connectionState by GlyphController.connectionState.collectAsState()
+    val statusMessage by GlyphController.statusMessage.collectAsState()
     val detectedModel by GlyphController.detectedModel.collectAsState()
     val activeDevice by GlyphController.activeDevice.collectAsState()
     val currentFrame by GlyphController.currentFrame.collectAsState()
@@ -211,6 +212,15 @@ fun GlyphTestScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                Text(
+                    text = "Статус: $statusMessage",
+                    color = if (connectionState == HardwareConnectionState.CONNECTED) Color(0xFF00FF66) else GlyphColors.TextMuted,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -228,6 +238,40 @@ fun GlyphTestScreen(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Model Switcher Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        com.nothing.glyphstudio.glyph.NothingDevice.PHONE_3A_PRO to "3a Pro [24111]",
+                        com.nothing.glyphstudio.glyph.NothingDevice.PHONE_2A to "2a [23111]",
+                        com.nothing.glyphstudio.glyph.NothingDevice.PHONE_2 to "Phone 2",
+                        com.nothing.glyphstudio.glyph.NothingDevice.PHONE_1 to "Phone 1"
+                    ).forEach { (device, label) ->
+                        val isSelected = activeDevice == device
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) GlyphColors.NeonRed else Color(0x22FFFFFF))
+                                .clickable { GlyphController.switchDevice(device) }
+                                .padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -723,6 +767,33 @@ fun GlyphTestScreen(
                             .padding(vertical = 2.dp)
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // SECTION 6: Nothing OS Troubleshooting & Permissions Helper
+        LiquidGlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "ℹ️ ПАМЯТКА ДЛЯ ПРОВЕРКИ ГЛИФОВ",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "• Если глифы не светятся на спинке смартфона:\n" +
+                            "  1. Откройте «Настройки» -> «Интерфейс Glyph» -> включите Glyph.\n" +
+                            "  2. Проверьте «Сторонние приложения» -> включите доступ для Glyph Studio.\n" +
+                            "  3. Убедитесь, что телефон не находится в режиме «Время сна» или «Не беспокоить».\n" +
+                            "• Для копирования полного лога нажмите «КОПИР.» в окне диагностики выше.",
+                    color = GlyphColors.TextMuted,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 14.sp
+                )
             }
         }
 
