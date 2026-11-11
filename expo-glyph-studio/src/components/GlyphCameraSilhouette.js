@@ -5,9 +5,9 @@ import { GlyphColors } from '../theme/colors';
 
 /**
  * 3 Continuous Glyph Arcs:
- * Index 0: Top-Left Arc
- * Index 1: Bottom-Left Arc
- * Index 2: Right Arc
+ * Index 0: Top-Left Arc (20 LEDs, #0..19)
+ * Index 1: Bottom-Left Arc (5 LEDs, #31..35)
+ * Index 2: Right Arc (11 LEDs, #20..30)
  */
 export const ARC_INDICES = {
   TOP_LEFT: 0,
@@ -15,9 +15,63 @@ export const ARC_INDICES = {
   RIGHT: 2,
 };
 
+/**
+ * Exact spatial coordinates of all 36 physical micro-LEDs on Nothing Phone (3a Pro / 3).
+ * Sequence: Top-Left (#0..19) -> Right (#20..30) -> Bottom-Left (#31..35).
+ */
+export const PIXEL_COORDINATES = (() => {
+  const cx = 150;
+  const cy = 150;
+  const glyphR = 116;
+  const rad = (deg) => (deg * Math.PI) / 180;
+  const coords = [];
+
+  // Arc 1: Top-Left (20 LEDs, #0..19): 198° to 239°
+  for (let i = 0; i < 20; i++) {
+    const angle = 198 + (i / 19) * (239 - 198);
+    coords.push({
+      id: i,
+      arc: ARC_INDICES.TOP_LEFT,
+      name: `Верх-Лево #${i}`,
+      x: cx + glyphR * Math.cos(rad(angle)),
+      y: cy + glyphR * Math.sin(rad(angle)),
+    });
+  }
+
+  // Arc 3: Right (11 LEDs, #20..30): -16° to 32°
+  for (let i = 0; i < 11; i++) {
+    const angle = -16 + (i / 10) * (32 - (-16));
+    const id = 20 + i;
+    coords.push({
+      id: id,
+      arc: ARC_INDICES.RIGHT,
+      name: `Справа #${i}`,
+      x: cx + glyphR * Math.cos(rad(angle)),
+      y: cy + glyphR * Math.sin(rad(angle)),
+    });
+  }
+
+  // Arc 2: Bottom-Left (5 LEDs, #31..35): 134° to 155°
+  for (let i = 0; i < 5; i++) {
+    const angle = 134 + (i / 4) * (155 - 134);
+    const id = 31 + i;
+    coords.push({
+      id: id,
+      arc: ARC_INDICES.BOTTOM_LEFT,
+      name: `Низ-Лево #${i}`,
+      x: cx + glyphR * Math.cos(rad(angle)),
+      y: cy + glyphR * Math.sin(rad(angle)),
+    });
+  }
+
+  return coords;
+})();
+
 export default function GlyphCameraSilhouette({
   brightness = [255, 255, 255], // [TL, BL, R] values 0..255
+  activePixel = null, // Optional single active pixel index (0..35)
   onArcPress,
+  onPixelPress,
   size = 280,
 }) {
   const cx = 150;
@@ -307,6 +361,51 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
           onPress={() => onArcPress && onArcPress(ARC_INDICES.RIGHT)}
         />
+
+        {/* ============================================================ */}
+        {/* 36 PHYSICAL MICRO-LEDS (STEPPER & AUTO-WALK INDICATION)      */}
+        {/* ============================================================ */}
+        {activePixel !== null && activePixel !== undefined && (
+          <G>
+            {PIXEL_COORDINATES.map((pixel) => {
+              const isActive = pixel.id === activePixel;
+              return (
+                <G key={pixel.id}>
+                  {isActive ? (
+                    <>
+                      {/* Active Pixel Neon Bloom */}
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r="10"
+                        fill="rgba(255, 255, 255, 0.45)"
+                      />
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r="6"
+                        fill="rgba(230, 245, 255, 0.9)"
+                      />
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r="3.8"
+                        fill="#FFFFFF"
+                      />
+                    </>
+                  ) : (
+                    <Circle
+                      cx={pixel.x}
+                      cy={pixel.y}
+                      r="1.8"
+                      fill="rgba(255, 255, 255, 0.2)"
+                    />
+                  )}
+                </G>
+              );
+            })}
+          </G>
+        )}
       </Svg>
     </View>
   );

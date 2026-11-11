@@ -715,7 +715,13 @@ object GlyphController {
         }
     }
 
-    fun startAutoWalk(scope: CoroutineScope, intervalMs: Long = 100L) {
+    val autoWalkSpeedMs = kotlinx.coroutines.flow.MutableStateFlow(80L)
+
+    fun setAutoWalkSpeed(speedMs: Long) {
+        autoWalkSpeedMs.value = speedMs.coerceIn(20L, 500L)
+    }
+
+    fun startAutoWalk(scope: CoroutineScope, brightness: Int = 255) {
         stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "AUTO_WALK"
         val seq = getCircularSequence(_activeDevice.value)
@@ -727,10 +733,10 @@ object GlyphController {
             while (isActive) {
                 val ch = seq[step % seq.size]
                 val array = IntArray(total)
-                if (ch in array.indices) array[ch] = 255
+                if (ch in array.indices) array[ch] = brightness.coerceIn(1, 255)
                 updateFrame(GlyphFrame(segmentBrightness = array))
                 step++
-                delay(intervalMs)
+                delay(autoWalkSpeedMs.value)
             }
         }
     }

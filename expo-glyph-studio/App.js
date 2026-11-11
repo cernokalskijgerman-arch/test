@@ -38,24 +38,125 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState(0);
   // 3 Continuous White Glyph Arcs: [Top-Left, Bottom-Left, Right] (0..255)
   const [brightness, setBrightness] = useState([255, 255, 255]);
+  const [masterBrightness, setMasterBrightness] = useState(255);
+  const [activePixel, setActivePixel] = useState(null);
+  const [isAutoWalk, setIsAutoWalk] = useState(false);
+  const [autoWalkSpeed, setAutoWalkSpeed] = useState(80);
   const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(false);
+
+  const autoWalkSpeedRef = useRef(autoWalkSpeed);
+  autoWalkSpeedRef.current = autoWalkSpeed;
+
+  const isAutoWalkRef = useRef(isAutoWalk);
+  isAutoWalkRef.current = isAutoWalk;
+
+  const activePixelRef = useRef(activePixel);
+  activePixelRef.current = activePixel;
+
+  const masterBrightnessRef = useRef(masterBrightness);
+  masterBrightnessRef.current = masterBrightness;
 
   const handleArcPress = useCallback((arcIndex) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBrightness((prev) => {
       const next = [...prev];
-      next[arcIndex] = next[arcIndex] > 0 ? 0 : 255;
+      const targetB = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      next[arcIndex] = next[arcIndex] > 0 ? 0 : targetB;
       return next;
     });
   }, []);
 
+  // Master brightness handler with immediate 0-cutoff and recovery
+  const handleMasterBrightnessChange = useCallback((newVal) => {
+    setMasterBrightness(newVal);
+    if (newVal <= 0) {
+      setBrightness([0, 0, 0]);
+      setActivePixel(null);
+      if (isAutoWalkRef.current) {
+        setIsAutoWalk(false);
+      }
+    } else {
+      setBrightness([newVal, newVal, newVal]);
+    }
+  }, []);
+
   const handleAllOn = useCallback((val = 255) => {
-    setBrightness([val, val, val]);
+    const target = val > 0 ? val : (masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255);
+    setMasterBrightness(target);
+    setBrightness([target, target, target]);
   }, []);
 
   const handleAllOff = useCallback(() => {
+    setMasterBrightness(0);
     setBrightness([0, 0, 0]);
+    setActivePixel(null);
+    if (isAutoWalkRef.current) {
+      setIsAutoWalk(false);
+    }
   }, []);
+
+  // Step-by-step pixel navigation
+  const handleActivePixelChange = useCallback((pixelId) => {
+    setActivePixel(pixelId);
+    if (pixelId === null) {
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      setBrightness([b, b, b]);
+    } else {
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      let arc = 0;
+      if (pixelId >= 0 && pixelId <= 19) arc = 0; // Top-Left
+      else if (pixelId >= 20 && pixelId <= 30) arc = 2; // Right
+      else if (pixelId >= 31 && pixelId <= 35) arc = 1; // Bottom-Left
+      const nextB = [0, 0, 0];
+      nextB[arc] = b;
+      setBrightness(nextB);
+    }
+  }, []);
+
+  // Auto-walk toggle & circular stepper loop with dynamic speed
+  const handleToggleAutoWalk = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setIsAutoWalk((prev) => !prev);
+  }, []);
+
+  // Real-time animation loop: uses autoWalkSpeedRef.current on every step for instant speed responsiveness
+  useEffect(() => {
+    if (!isAutoWalk) {
+      return;
+    }
+
+    let isCancelled = false;
+    let timerId = null;
+
+    const runStep = () => {
+      if (isCancelled || !isAutoWalkRef.current) return;
+
+      const current = activePixelRef.current !== null ? activePixelRef.current : -1;
+      const nextPixel = (current + 1) % 36;
+      activePixelRef.current = nextPixel;
+      setActivePixel(nextPixel);
+
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      let arc = 0;
+      if (nextPixel >= 0 && nextPixel <= 19) arc = 0; // Top-Left
+      else if (nextPixel >= 20 && nextPixel <= 30) arc = 2; // Right
+      else if (nextPixel >= 31 && nextPixel <= 35) arc = 1; // Bottom-Left
+      const nextB = [0, 0, 0];
+      nextB[arc] = b;
+      setBrightness(nextB);
+
+      // Instantaneous speed adjustment from ref
+      const currentSpeed = Math.max(20, autoWalkSpeedRef.current || 80);
+      timerId = setTimeout(runStep, currentSpeed);
+    };
+
+    runStep();
+
+    return () => {
+      isCancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [isAutoWalk]);
 
   const handleTabSwitch = (tabIndex) => {
     Haptics.selectionAsync().catch(() => {});
@@ -122,6 +223,7 @@ export default function App() {
           <>
             <GlyphCameraSilhouette
               brightness={brightness}
+              activePixel={activePixel}
               onArcPress={handleArcPress}
               size={220}
             />
@@ -213,6 +315,14 @@ export default function App() {
         {currentTab === 0 && (
           <DashboardScreen
             brightness={brightness}
+            masterBrightness={masterBrightness}
+            onMasterBrightnessChange={handleMasterBrightnessChange}
+            activePixel={activePixel}
+            onActivePixelChange={handleActivePixelChange}
+            isAutoWalk={isAutoWalk}
+            onToggleAutoWalk={handleToggleAutoWalk}
+            autoWalkSpeed={autoWalkSpeed}
+            onAutoWalkSpeedChange={setAutoWalkSpeed}
             onNavigateTab={handleTabSwitch}
             onTriggerUtility={handleTriggerQuickUtility}
             onAllOn={handleAllOn}

@@ -79,6 +79,7 @@ fun GlyphTestScreen(
     val diagnosticLogs by GlyphController.diagnosticLogs.collectAsState()
 
     var masterBrightness by remember { mutableFloatStateOf(255f) }
+    var autoWalkSpeed by remember { mutableFloatStateOf(80f) }
     var selectedChannel by remember { mutableIntStateOf(0) }
     var isLogsExpanded by remember { mutableStateOf(false) }
 
@@ -392,7 +393,9 @@ fun GlyphTestScreen(
                     value = masterBrightness,
                     onValueChange = { newVal ->
                         masterBrightness = newVal
-                        if (activeCount > 0) {
+                        if (newVal <= 0f) {
+                            GlyphController.turnAllOff()
+                        } else {
                             GlyphController.turnAllOn(newVal.toInt())
                         }
                     },
@@ -546,7 +549,7 @@ fun GlyphTestScreen(
                         if (isAutoWalk) {
                             GlyphController.stopAutoWalk()
                         } else {
-                            GlyphController.startAutoWalk(coroutineScope)
+                            GlyphController.startAutoWalk(coroutineScope, masterBrightness.toInt())
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -570,6 +573,43 @@ fun GlyphTestScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "СКОРОСТЬ ШАГА АНИМАЦИИ",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${autoWalkSpeed.toInt()} мс / шаг",
+                        color = Color(0xFF00E5FF),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Slider(
+                    value = autoWalkSpeed,
+                    onValueChange = { newVal ->
+                        autoWalkSpeed = newVal
+                        GlyphController.setAutoWalkSpeed(newVal.toLong())
+                    },
+                    valueRange = 20f..500f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color(0xFF00E5FF),
+                        activeTrackColor = Color(0xFF00E5FF),
+                        inactiveTrackColor = Color(0xFF33333C)
+                    )
+                )
             }
         }
 
