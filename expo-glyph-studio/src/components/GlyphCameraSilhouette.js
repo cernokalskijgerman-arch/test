@@ -234,7 +234,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bTL > 0.02 && (
+        {bTL > 0.02 && activePixel === null && (
           <G>
             {/* Outer soft bloom */}
             <Path
@@ -282,7 +282,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bBL > 0.02 && (
+        {bBL > 0.02 && activePixel === null && (
           <G>
             <Path
               d={pathBL}
@@ -327,7 +327,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bR > 0.02 && (
+        {bR > 0.02 && activePixel === null && (
           <G>
             <Path
               d={pathR}
@@ -377,19 +377,19 @@ export default function GlyphCameraSilhouette({
                       <Circle
                         cx={pixel.x}
                         cy={pixel.y}
-                        r="10"
-                        fill="rgba(255, 255, 255, 0.45)"
+                        r="14"
+                        fill="rgba(255, 255, 255, 0.35)"
                       />
                       <Circle
                         cx={pixel.x}
                         cy={pixel.y}
-                        r="6"
-                        fill="rgba(230, 245, 255, 0.9)"
+                        r="8"
+                        fill="rgba(230, 245, 255, 0.85)"
                       />
                       <Circle
                         cx={pixel.x}
                         cy={pixel.y}
-                        r="3.8"
+                        r="4.5"
                         fill="#FFFFFF"
                       />
                     </>
@@ -397,8 +397,8 @@ export default function GlyphCameraSilhouette({
                     <Circle
                       cx={pixel.x}
                       cy={pixel.y}
-                      r="1.8"
-                      fill="rgba(255, 255, 255, 0.2)"
+                      r="2"
+                      fill="rgba(255, 255, 255, 0.25)"
                     />
                   )}
                 </G>

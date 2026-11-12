@@ -51,7 +51,6 @@ export default function App() {
   const [isAutoWalk, setIsAutoWalk] = useState(false);
   const [autoWalkSpeed, setAutoWalkSpeed] = useState(80);
   const [autoWalkMode, setAutoWalkMode] = useState('forward'); // 'forward' | 'reverse' | 'pingpong' | 'random'
-  const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(false);
 
   // Screen transition animations
   const screenFadeAnim = useRef(new Animated.Value(1)).current;
@@ -255,6 +254,20 @@ export default function App() {
     if (tabIndex === cur) return;
     Haptics.selectionAsync().catch(() => {});
 
+    // Clean up active pixel and auto-walk when switching tabs to eliminate stuck pixels
+    if (cur === 1 && tabIndex !== 1) {
+      setIsAutoWalk(false);
+      isAutoWalkRef.current = false;
+      if (stepTimerRef.current) {
+        clearTimeout(stepTimerRef.current);
+        stepTimerRef.current = null;
+      }
+      setActivePixel(null);
+      activePixelRef.current = null;
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      setBrightness([b, b, b]);
+    }
+
     const direction = tabIndex > cur ? 1 : -1;
     screenTranslateX.setValue(direction * 35);
     screenFadeAnim.setValue(0.5);
@@ -342,75 +355,14 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Persistent Floating Camera Module (NO phone chassis) */}
+      {/* Prominent Glowing Camera Module with Glyph Arcs */}
       <View style={styles.simulatorContainer}>
-        {!isMatrixCollapsed ? (
-          <>
-            <GlyphCameraSilhouette
-              brightness={brightness}
-              activePixel={activePixel}
-              onArcPress={handleArcPress}
-              size={215}
-            />
-
-            {/* 3 Quick Arc Toggles */}
-            <View style={styles.arcPillRow}>
-              <TouchableOpacity
-                style={[styles.arcPill, brightness[0] > 10 && styles.arcPillActive]}
-                onPress={() => handleArcPress(0)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.arcPillDot, brightness[0] > 10 && styles.arcPillDotActive]} />
-                <Text style={[styles.arcPillText, brightness[0] > 10 && styles.arcPillTextActive]}>
-                  ВЕРХ-ЛЕВ
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.arcPill, brightness[1] > 10 && styles.arcPillActive]}
-                onPress={() => handleArcPress(1)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.arcPillDot, brightness[1] > 10 && styles.arcPillDotActive]} />
-                <Text style={[styles.arcPillText, brightness[1] > 10 && styles.arcPillTextActive]}>
-                  НИЗ-ЛЕВ
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.arcPill, brightness[2] > 10 && styles.arcPillActive]}
-                onPress={() => handleArcPress(2)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.arcPillDot, brightness[2] > 10 && styles.arcPillDotActive]} />
-                <Text style={[styles.arcPillText, brightness[2] > 10 && styles.arcPillTextActive]}>
-                  ПРАВЫЙ
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <View style={styles.collapsedBadgeRow}>
-            <View style={[styles.collapsedDot, isAnyOn && styles.collapsedDotActive]} />
-            <Text style={styles.collapsedText}>
-              ГЛИФ: {isAnyOn ? 'СВЕЧЕНИЕ АКТИВНО' : 'ОТКЛЮЧЕНО'}
-            </Text>
-          </View>
-        )}
-
-        {/* Toggle to collapse/expand camera block */}
-        <TouchableOpacity
-          style={styles.collapseToggle}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            setIsMatrixCollapsed((prev) => !prev);
-          }}
-          activeOpacity={0.6}
-        >
-          <Text style={styles.collapseToggleText}>
-            {isMatrixCollapsed ? '▼ РАЗВЕРНУТЬ GLYPH' : '▲ СВЕРНУТЬ'}
-          </Text>
-        </TouchableOpacity>
+        <GlyphCameraSilhouette
+          brightness={brightness}
+          activePixel={activePixel}
+          onArcPress={handleArcPress}
+          size={265}
+        />
       </View>
 
       {/* Active Screen View with Swipe Gestures & Smooth Spring Transition Animation */}
@@ -544,84 +496,8 @@ const styles = StyleSheet.create({
   simulatorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  arcPillRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 6,
-    paddingHorizontal: 16,
-  },
-  arcPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  arcPillActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderColor: 'rgba(255, 255, 255, 0.65)',
-  },
-  arcPillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#444450',
-    marginRight: 6,
-  },
-  arcPillDotActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowRadius: 5,
-    shadowOpacity: 1,
-  },
-  arcPillText: {
-    fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#777785',
-    letterSpacing: 1,
-  },
-  arcPillTextActive: {
-    color: '#FFFFFF',
-  },
-  collapsedBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  collapsedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#555555',
-    marginRight: 8,
-  },
-  collapsedDotActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowRadius: 6,
-    shadowOpacity: 1,
-  },
-  collapsedText: {
-    fontFamily: 'NDOT57',
-    fontSize: 11,
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  collapseToggle: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginTop: 1,
-  },
-  collapseToggleText: {
-    fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#666666',
-    letterSpacing: 1,
+    paddingTop: 4,
+    paddingBottom: 2,
   },
   screenContainer: {
     flex: 1,

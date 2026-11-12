@@ -3,18 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
   Animated,
   Platform,
-  PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from './LiquidGlassCard';
-import { GlyphColors } from '../theme/colors';
 
+/**
+ * iOS-style Liquid Glass Category Switcher Bottom Sheet.
+ * Implemented as an in-tree overlay to guarantee 100% crash-free,
+ * freeze-free operation across Android and iOS in Expo Go (no OS Dialog Window collisions).
+ */
 export default function CategorySwitcherModal({
   visible,
   categories = [],
@@ -23,7 +26,7 @@ export default function CategorySwitcherModal({
   onClose,
   stats = {},
 }) {
-  const slideAnim = useRef(new Animated.Value(550)).current;
+  const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -31,13 +34,13 @@ export default function CategorySwitcherModal({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 220,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          tension: 75,
-          friction: 12,
+          tension: 100,
+          friction: 13,
           useNativeDriver: true,
         }),
       ]).start();
@@ -45,44 +48,19 @@ export default function CategorySwitcherModal({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 160,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
-          toValue: 550,
-          duration: 180,
+          toValue: 600,
+          duration: 160,
           useNativeDriver: true,
         }),
       ]).start();
     }
   }, [visible]);
 
-  // Pull-down dismiss PanResponder for iOS sheet feel
-  const handlePanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 10;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          slideAnim.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 80 || gestureState.vy > 0.5) {
-          Haptics.selectionAsync().catch(() => {});
-          onClose();
-        } else {
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            tension: 80,
-            friction: 12,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
+  if (!visible) return null;
 
   const handleSelect = (index) => {
     Haptics.selectionAsync().catch(() => {});
@@ -91,191 +69,217 @@ export default function CategorySwitcherModal({
   };
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      onRequestClose={onClose}
-    >
+    <View style={styles.overlayRoot} pointerEvents="auto">
+      {/* Blurred Backdrop */}
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 70 : 50}
+            intensity={Platform.OS === 'ios' ? 50 : 35}
             tint="dark"
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
       </TouchableWithoutFeedback>
 
-      <View style={styles.sheetWrapper} pointerEvents="box-none">
-        <Animated.View
-          style={[
-            styles.sheetContainer,
-            {
-              transform: [{ translateY: slideAnim }],
-            },
+      {/* Floating Sheet Container */}
+      <Animated.View
+        style={[
+          styles.sheetContainer,
+          {
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        {/* BlurView for Liquid Glass Sheet */}
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 45 : 30}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Specular physical reflection gradient sheen */}
+        <LinearGradient
+          colors={[
+            'rgba(255, 255, 255, 0.22)',
+            'rgba(255, 255, 255, 0.02)',
+            'rgba(0, 0, 0, 0.42)',
           ]}
-        >
-          {/* iOS Grab Handle with pull-down gesture */}
-          <View style={styles.handleContainer} {...handlePanResponder.panHandlers}>
-            <View style={styles.handleBar} />
+          locations={[0, 0.45, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* Top edge chamfered specular rim highlight */}
+        <View pointerEvents="none" style={styles.topRimHighlight} />
+
+        {/* Grab Handle */}
+        <View style={styles.handleContainer}>
+          <View style={styles.handleBar} />
+        </View>
+
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.sheetTitle}>ПЕРЕКЛЮЧЕНИЕ КАТЕГОРИЙ</Text>
+            <Text style={styles.sheetSubtitle}>Быстрый переход между разделами</Text>
           </View>
+          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.sheetTitle}>ПЕРЕКЛЮЧЕНИЕ КАТЕГОРИЙ</Text>
-              <Text style={styles.sheetSubtitle}>Быстрый переход между разделами</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Category Cards List */}
+        <View style={styles.cardsList}>
+          {categories.map((cat) => {
+            const isActive = currentTab === cat.id;
+            const catStat = stats[cat.id];
 
-          {/* Category Cards List */}
-          <View style={styles.cardsList}>
-            {categories.map((cat) => {
-              const isActive = currentTab === cat.id;
-              const catStat = stats[cat.id];
-
-              return (
-                <LiquidGlassCard
-                  key={cat.id}
-                  isActive={isActive}
-                  onPress={() => handleSelect(cat.id)}
-                  style={styles.categoryCard}
-                >
-                  <View style={styles.categoryRow}>
-                    <View style={styles.categoryLeft}>
-                      {/* Active indicator dot */}
-                      <View
-                        style={[
-                          styles.categoryDot,
-                          isActive && styles.categoryDotActive,
-                        ]}
-                      />
-                      <View>
-                        <Text
-                          style={[
-                            styles.categoryLabel,
-                            isActive && styles.categoryLabelActive,
-                          ]}
-                        >
-                          {cat.label}
-                        </Text>
-                        <Text style={styles.categoryDesc}>{cat.subtitle}</Text>
-                      </View>
-                    </View>
-
-                    {/* Status Pill Badge */}
+            return (
+              <LiquidGlassCard
+                key={cat.id}
+                isActive={isActive}
+                onPress={() => handleSelect(cat.id)}
+                style={styles.categoryCard}
+              >
+                <View style={styles.categoryRow}>
+                  <View style={styles.categoryLeft}>
+                    {/* Active indicator dot */}
                     <View
                       style={[
-                        styles.statPill,
-                        isActive && styles.statPillActive,
+                        styles.categoryDot,
+                        isActive && styles.categoryDotActive,
                       ]}
-                    >
+                    />
+                    <View>
                       <Text
                         style={[
-                          styles.statPillText,
-                          isActive && styles.statPillTextActive,
+                          styles.categoryLabel,
+                          isActive && styles.categoryLabelActive,
                         ]}
                       >
-                        {catStat || (isActive ? 'АКТИВЕН' : 'ОТКРЫТЬ')}
+                        {cat.label}
                       </Text>
+                      <Text style={styles.categoryDesc}>{cat.subtitle}</Text>
                     </View>
                   </View>
-                </LiquidGlassCard>
-              );
-            })}
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
+
+                  {/* Status Pill Badge */}
+                  <View
+                    style={[
+                      styles.statPill,
+                      isActive && styles.statPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statPillText,
+                        isActive && styles.statPillTextActive,
+                      ]}
+                    >
+                      {catStat || (isActive ? 'АКТИВЕН' : 'ОТКРЫТЬ')}
+                    </Text>
+                  </View>
+                </View>
+              </LiquidGlassCard>
+            );
+          })}
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  overlayRoot: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.70)',
-  },
-  sheetWrapper: {
-    flex: 1,
+    zIndex: 999,
     justifyContent: 'flex-end',
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
   sheetContainer: {
-    backgroundColor: 'rgba(14, 16, 24, 0.95)',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderWidth: 1.2,
-    borderTopColor: GlyphColors.glassSpecularTop,
-    borderLeftColor: GlyphColors.glassSpecularLeft,
-    borderRightColor: GlyphColors.glassSpecularRight,
-    borderBottomColor: 'transparent',
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    backgroundColor: 'rgba(14, 16, 24, 0.85)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: -10 },
-        shadowOpacity: 0.6,
-        shadowRadius: 25,
+        shadowOpacity: 0.5,
+        shadowRadius: 24,
       },
       android: {
         elevation: 16,
       },
     }),
   },
+  topRimHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    right: 20,
+    height: 1.2,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+  },
   handleContainer: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   handleBar: {
-    width: 44,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.30)',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 10,
+    marginVertical: 8,
   },
   sheetTitle: {
     fontFamily: 'NDOT57',
-    fontSize: 14,
+    fontSize: 12,
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   sheetSubtitle: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#8E8E98',
     marginTop: 2,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.20)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   cardsList: {
-    gap: 8,
-    marginTop: 6,
+    gap: 6,
+    marginTop: 4,
   },
   categoryCard: {
-    marginVertical: 2,
+    marginVertical: 1,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -288,23 +292,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#404050',
-    marginRight: 12,
+    marginRight: 10,
   },
   categoryDotActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#FFFFFF',
-    shadowRadius: 8,
+    shadowRadius: 6,
     shadowOpacity: 1,
   },
   categoryLabel: {
     fontFamily: 'NDOT57',
-    fontSize: 12,
+    fontSize: 11,
     color: '#B0B0C0',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
   categoryLabelActive: {
     color: '#FFFFFF',
@@ -312,28 +316,28 @@ const styles = StyleSheet.create({
   },
   categoryDesc: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
+    fontSize: 8,
     color: '#656575',
-    marginTop: 2,
-    letterSpacing: 0.5,
+    marginTop: 1,
+    letterSpacing: 0.4,
   },
   statPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
   },
   statPillActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.20)',
-    borderColor: 'rgba(255, 255, 255, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.60)',
   },
   statPillText: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
+    fontSize: 7.5,
     color: '#707080',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   statPillTextActive: {
     color: '#FFFFFF',

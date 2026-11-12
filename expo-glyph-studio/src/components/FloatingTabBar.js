@@ -84,11 +84,8 @@ export function FloatingTabBar({
     const isFocused = activeIndex === index;
 
     if (isFocused) {
-      // Re-tap on active tab -> open Category Switcher mode!
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      if (onOpenCategorySwitcher) {
-        onOpenCategorySwitcher();
-      }
+      // Re-tap on active tab: provide subtle tactile pulse feedback, completely smooth, NO FREEZING!
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       return;
     }
 

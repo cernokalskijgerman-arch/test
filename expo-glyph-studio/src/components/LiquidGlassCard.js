@@ -8,20 +8,19 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GlyphColors } from '../theme/colors';
 
 /**
- * iOS / visionOS authentic Liquid Glass Card.
- * Multi-layer optical refraction with specular rim highlights,
- * ambient depth shadow, and tactile fluid spring press deformation.
+ * Authentic Liquid Glass Card matching Floating Glassmorphic Tab Bar.
+ * Incorporates hardware-accelerated blur, physical specular sheen gradient,
+ * chamfered top rim highlight, and tactile spring micro-compression.
  */
 export default function LiquidGlassCard({
   children,
   style,
   onPress,
   isActive = false,
-  intensity = 45,
-  variant = 'default', // 'default' | 'pill' | 'elevated' | 'subtle'
+  intensity = 40,
+  variant = 'default', // 'default' | 'pill' | 'compact'
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const sheenAnim = useRef(new Animated.Value(0)).current;
@@ -30,14 +29,14 @@ export default function LiquidGlassCard({
     if (!onPress) return;
     Animated.parallel([
       Animated.spring(scaleAnim, {
-        toValue: 0.982,
-        tension: 180,
+        toValue: 0.985,
+        tension: 200,
         friction: 12,
         useNativeDriver: true,
       }),
       Animated.timing(sheenAnim, {
         toValue: 1,
-        duration: 120,
+        duration: 100,
         useNativeDriver: true,
       }),
     ]).start();
@@ -48,20 +47,20 @@ export default function LiquidGlassCard({
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
-        tension: 160,
+        tension: 180,
         friction: 10,
         useNativeDriver: true,
       }),
       Animated.timing(sheenAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start();
   };
 
   const isPill = variant === 'pill';
-  const borderRadius = isPill ? 30 : 24;
+  const borderRadius = isPill ? 24 : 18;
 
   const cardContent = (
     <Animated.View
@@ -75,38 +74,41 @@ export default function LiquidGlassCard({
     >
       {/* 1. Frosted Blur Background (Hardware accelerated on iOS and Android) */}
       <BlurView
-        intensity={Platform.OS === 'ios' ? intensity : Math.min(intensity, 55)}
+        intensity={Platform.OS === 'ios' ? intensity : Math.min(intensity, 35)}
         tint="dark"
         style={[StyleSheet.absoluteFill, { borderRadius }]}
       />
 
-      {/* 2. Deep optical glass refraction base gradient */}
-      <LinearGradient
-        colors={
-          isActive
-            ? ['rgba(255, 255, 255, 0.16)', 'rgba(25, 28, 42, 0.38)', 'rgba(10, 12, 18, 0.72)']
-            : ['rgba(255, 255, 255, 0.08)', 'rgba(20, 22, 34, 0.30)', 'rgba(8, 10, 16, 0.65)']
-        }
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={[StyleSheet.absoluteFill, { borderRadius }]}
-      />
-
-      {/* 3. Diagonal specular light reflection sheen (Prism caustic refraction) */}
+      {/* 2. Liquid Glass physical specular sheen gradient (identical to Tab Bar) */}
       <LinearGradient
         colors={[
-          'rgba(255, 255, 255, 0.15)',
-          'rgba(255, 255, 255, 0.04)',
-          'transparent',
-          'rgba(255, 255, 255, 0.03)',
+          'rgba(255, 255, 255, 0.20)',
+          'rgba(255, 255, 255, 0.02)',
+          'rgba(0, 0, 0, 0.40)',
         ]}
-        locations={[0, 0.28, 0.65, 1]}
+        locations={[0, 0.45, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={[StyleSheet.absoluteFill, { borderRadius }]}
+        pointerEvents="none"
+      />
+
+      {/* 3. Diagonal secondary prism sheen */}
+      <LinearGradient
+        colors={[
+          'rgba(255, 255, 255, 0.12)',
+          'rgba(255, 255, 255, 0.02)',
+          'transparent',
+          'rgba(255, 255, 255, 0.02)',
+        ]}
+        locations={[0, 0.3, 0.7, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0.8 }}
         style={[StyleSheet.absoluteFill, { borderRadius }]}
+        pointerEvents="none"
       />
 
-      {/* 4. Interactive touch light ripple sheen */}
+      {/* 4. Interactive touch ripple sheen */}
       {onPress && (
         <Animated.View
           pointerEvents="none"
@@ -115,13 +117,13 @@ export default function LiquidGlassCard({
             {
               borderRadius,
               opacity: sheenAnim,
-              backgroundColor: 'rgba(255, 255, 255, 0.07)',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
             },
           ]}
         />
       )}
 
-      {/* 5. Top Specular Glass Edge Highlight (Simulating 1.5px chamfered prism refraction) */}
+      {/* 5. Top Specular Glass Edge Highlight */}
       <View
         pointerEvents="none"
         style={[
@@ -131,27 +133,13 @@ export default function LiquidGlassCard({
             borderTopRightRadius: borderRadius,
           },
         ]}
-      >
-        <LinearGradient
-          colors={[
-            'rgba(255, 255, 255, 0.90)',
-            'rgba(255, 255, 255, 0.45)',
-            'rgba(255, 255, 255, 0.08)',
-          ]}
-          start={{ x: 0.05, y: 0 }}
-          end={{ x: 0.95, y: 0 }}
-          style={styles.topRimGradient}
-        />
-      </View>
+      />
 
       {/* 6. Active Halo Ambient Rim */}
       {isActive && (
         <View
           pointerEvents="none"
-          style={[
-            styles.activeHaloRim,
-            { borderRadius },
-          ]}
+          style={[styles.activeHaloRim, { borderRadius }]}
         />
       )}
 
@@ -181,34 +169,28 @@ const styles = StyleSheet.create({
   outerContainer: {
     overflow: 'hidden',
     position: 'relative',
-    borderWidth: 1.2,
-    borderTopColor: GlyphColors.glassSpecularTop,
-    borderLeftColor: GlyphColors.glassSpecularLeft,
-    borderRightColor: GlyphColors.glassSpecularRight,
-    borderBottomColor: GlyphColors.glassSpecularBottom,
-    backgroundColor: 'rgba(16, 18, 26, 0.45)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(14, 16, 24, 0.68)',
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.45,
-        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 6,
+        elevation: 8,
       },
     }),
   },
   activeOuter: {
-    borderTopColor: '#FFFFFF',
-    borderLeftColor: 'rgba(255, 255, 255, 0.85)',
-    borderRightColor: 'rgba(255, 255, 255, 0.45)',
-    borderBottomColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.40)',
     ...Platform.select({
       ios: {
         shadowColor: '#FFFFFF',
-        shadowOpacity: 0.25,
-        shadowRadius: 22,
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
       },
       android: {
         elevation: 10,
@@ -218,24 +200,21 @@ const styles = StyleSheet.create({
   topRimHighlight: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
-    height: 1.5,
-    overflow: 'hidden',
-  },
-  topRimGradient: {
-    flex: 1,
+    left: 10,
+    right: 10,
+    height: 1.2,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
   activeHaloRim: {
     ...StyleSheet.absoluteFillObject,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   innerContent: {
-    padding: 16,
+    padding: 12,
   },
   pillInner: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
 });
