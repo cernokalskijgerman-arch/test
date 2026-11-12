@@ -603,7 +603,7 @@ fun GlyphTestScreen(
                         autoWalkSpeed = newVal
                         GlyphController.setAutoWalkSpeed(newVal.toLong())
                     },
-                    valueRange = 20f..500f,
+                    valueRange = 1f..500f,
                     colors = SliderDefaults.colors(
                         thumbColor = Color(0xFF00E5FF),
                         activeTrackColor = Color(0xFF00E5FF),

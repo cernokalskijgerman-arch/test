@@ -13,18 +13,16 @@ import { GlyphColors } from '../theme/colors';
 
 /**
  * Screen 5: «УТИЛИТЫ»
- * Minimalist tools: Softlight flashlight, Strobe beacon, Visual Countdown Timer,
+ * Minimalist tools: Strobe beacon, Visual Countdown Timer,
  * Battery HUD, Single-Pixel Spin the Bottle, and Reflex Reaction Test.
  */
 export default function UtilitiesScreen({
   brightness,
   onBrightnessChange,
   onActivePixelChange,
+  onPixelLevelsChange,
 }) {
-  const [activeMode, setActiveMode] = useState(null); // 'softlight' | 'strobe' | 'timer' | 'battery' | 'roulette' | 'reflex'
-
-  // Softlight State
-  const [softlightLevel, setSoftlightLevel] = useState(255);
+  const [activeMode, setActiveMode] = useState(null); // 'strobe' | 'timer' | 'battery' | 'breath' | 'morse' | 'roulette' | 'reflex' | 'precision'
 
   // Strobe State
   const [strobeHz, setStrobeHz] = useState(10);
@@ -37,6 +35,27 @@ export default function UtilitiesScreen({
   // Battery State
   const [batteryLevel, setBatteryLevel] = useState(82);
 
+  // Breathing Zen 4-7-8 State
+  const [isBreathing, setIsBreathing] = useState(false);
+  const [breathPhase, setBreathPhase] = useState('INHALE'); // 'INHALE' | 'HOLD' | 'EXHALE'
+  const [breathSeconds, setBreathSeconds] = useState(4);
+  const [breathCycle, setBreathCycle] = useState(0);
+
+  // Morse Code Beacon State
+  const [isMorseRunning, setIsMorseRunning] = useState(false);
+  const [morsePreset, setMorsePreset] = useState('SOS');
+  const [currentMorseIndex, setCurrentMorseIndex] = useState(-1);
+
+  // Precision Timing Arcade Game State
+  const [isPrecisionRunning, setIsPrecisionRunning] = useState(false);
+  const [precisionScore, setPrecisionScore] = useState(0);
+  const [precisionStreak, setPrecisionStreak] = useState(1);
+  const [precisionLives, setPrecisionLives] = useState(3);
+  const [precisionBestScore, setPrecisionBestScore] = useState(0);
+  const [precisionGameOver, setPrecisionGameOver] = useState(false);
+  const [precisionTarget, setPrecisionTarget] = useState(12);
+  const [precisionRunner, setPrecisionRunner] = useState(0);
+
   // Bottle Spin (Roulette) State: Single Moving Pixel
   const [isSpinning, setIsSpinning] = useState(false);
   const [winnerPixel, setWinnerPixel] = useState(null);
@@ -46,46 +65,44 @@ export default function UtilitiesScreen({
   const [reactionTime, setReactionTime] = useState(0);
   const [bestTime, setBestTime] = useState(0);
 
-  // Refs for timers
+  // Refs for timers & animation loops
   const strobeTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
   const spinTimerRef = useRef(null);
   const reflexTimerRef = useRef(null);
   const reflexStartTimeRef = useRef(0);
   const spinStepRef = useRef(0);
+  const breathTimerRef = useRef(null);
+  const breathStartTimeRef = useRef(0);
+  const morseTimerRef = useRef(null);
+  const precisionTimerRef = useRef(null);
+  const precisionRunnerRef = useRef(0);
+  const precisionTargetRef = useRef(12);
+  const precisionSpeedRef = useRef(85);
+  const precisionStreakRef = useRef(1);
+  const precisionScoreRef = useRef(0);
+  const precisionLivesRef = useRef(3);
 
   const stopAll = () => {
     setActiveMode(null);
     setIsTimerRunning(false);
     setIsSpinning(false);
+    setIsBreathing(false);
+    setIsMorseRunning(false);
+    setIsPrecisionRunning(false);
     if (strobeTimerRef.current) clearInterval(strobeTimerRef.current);
     if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
     if (reflexTimerRef.current) clearTimeout(reflexTimerRef.current);
+    if (breathTimerRef.current) clearInterval(breathTimerRef.current);
+    if (morseTimerRef.current) clearTimeout(morseTimerRef.current);
+    if (precisionTimerRef.current) clearTimeout(precisionTimerRef.current);
     if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
     if (onActivePixelChange) onActivePixelChange(null);
+    if (onPixelLevelsChange) onPixelLevelsChange(null);
   };
 
-  // 1. Softlight Handlers
-  const handleToggleSoftlight = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    if (activeMode === 'softlight') {
-      stopAll();
-    } else {
-      stopAll();
-      setActiveMode('softlight');
-      if (onBrightnessChange) onBrightnessChange([softlightLevel, softlightLevel, softlightLevel]);
-    }
-  };
-
-  const handleSoftlightLevelChange = (val) => {
-    setSoftlightLevel(val);
-    if (activeMode === 'softlight' && onBrightnessChange) {
-      onBrightnessChange([val, val, val]);
-    }
-  };
-
-  // 2. Strobe Handlers
+  // 1. Strobe Handlers
   const handleToggleStrobe = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     if (activeMode === 'strobe') {
@@ -163,10 +180,23 @@ export default function UtilitiesScreen({
   };
 
   const applyBatteryGlyphs = (level) => {
-    const tl = level > 5 ? Math.round(Math.min(1, level / 33) * 255) : 0;
-    const bl = level > 33 ? Math.round(Math.min(1, (level - 33) / 33) * 255) : 0;
-    const r = level > 66 ? Math.round(Math.min(1, (level - 66) / 34) * 255) : 0;
-    if (onBrightnessChange) onBrightnessChange([tl, bl, r]);
+    // Fill / unfill micro-LEDs by sequential count (36 LEDs total) rather than dimming
+    const count = Math.round((level / 100) * 36);
+    if (count <= 0) {
+      if (onActivePixelChange) onActivePixelChange([]);
+      if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+      return;
+    }
+    const activePixels = [];
+    for (let i = 0; i < count; i++) {
+      activePixels.push(i);
+    }
+    if (onActivePixelChange) {
+      onActivePixelChange(activePixels);
+    }
+    if (onBrightnessChange) {
+      onBrightnessChange([0, 0, 0]);
+    }
   };
 
   const handleBatteryLevelChange = (newLevel) => {
@@ -208,11 +238,11 @@ export default function UtilitiesScreen({
 
       if (step < totalSteps) {
         const progress = step / totalSteps;
-        // Non-linear natural deceleration curve (starts at fast 16ms, smoothly decelerates up to ~220ms)
-        let delayMs = 16;
+        // Non-linear natural deceleration curve (starts at 120Hz 8ms, smoothly decelerates up to ~220ms)
+        let delayMs = 8;
         if (progress > 0.45) {
           const decelFactor = (progress - 0.45) / 0.55;
-          delayMs = 16 + Math.floor(Math.pow(decelFactor, 2.4) * 210);
+          delayMs = 8 + Math.floor(Math.pow(decelFactor, 2.4) * 218);
         }
 
         spinTimerRef.current = setTimeout(runStep, delayMs);
@@ -275,14 +305,301 @@ export default function UtilitiesScreen({
     }
   };
 
+  // 7. Breathing Zen 4-7-8 Handlers
+  const handleToggleBreath = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (activeMode === 'breath') {
+      stopAll();
+    } else {
+      stopAll();
+      setActiveMode('breath');
+      setIsBreathing(true);
+      startBreathingCycle();
+    }
+  };
+
+  const startBreathingCycle = () => {
+    if (breathTimerRef.current) clearInterval(breathTimerRef.current);
+    breathStartTimeRef.current = Date.now();
+    let lastPhase = '';
+
+    breathTimerRef.current = setInterval(() => {
+      const now = Date.now();
+      const elapsedTotal = (now - breathStartTimeRef.current) / 1000;
+      const cycleTime = elapsedTotal % 19; // 4s inhale + 7s hold + 8s exhale = 19s
+      const currentCycle = Math.floor(elapsedTotal / 19) + 1;
+      setBreathCycle(currentCycle);
+
+      let currentB = 0;
+      let phaseName = 'INHALE';
+      let secsLeft = 0;
+
+      if (cycleTime < 4) {
+        // INHALE: 0..4s (smooth organic sine swell 20 -> 255)
+        phaseName = 'INHALE';
+        secsLeft = Math.ceil(4 - cycleTime);
+        const p = cycleTime / 4;
+        currentB = Math.round(20 + 235 * (1 - Math.cos(p * Math.PI)) / 2);
+      } else if (cycleTime < 11) {
+        // HOLD: 4..11s (steady 255 with subtle calm oscillation)
+        phaseName = 'HOLD';
+        secsLeft = Math.ceil(11 - cycleTime);
+        const holdP = (cycleTime - 4) / 7;
+        currentB = Math.round(250 + 5 * Math.sin(holdP * Math.PI * 4));
+      } else {
+        // EXHALE: 11..19s (smooth organic sine descent 255 -> 20)
+        phaseName = 'EXHALE';
+        secsLeft = Math.ceil(19 - cycleTime);
+        const p = (cycleTime - 11) / 8;
+        currentB = Math.round(20 + 235 * (1 + Math.cos(p * Math.PI)) / 2);
+      }
+
+      setBreathPhase(phaseName);
+      setBreathSeconds(secsLeft);
+
+      if (phaseName !== lastPhase) {
+        lastPhase = phaseName;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+
+      if (onBrightnessChange) {
+        onBrightnessChange([currentB, currentB, currentB]);
+      }
+    }, 8); // 120Hz high-refresh organic breathing curve
+  };
+
+  // 8. Morse Code Tactical Beacon Handlers
+  const MORSE_PATTERNS = {
+    'SOS': [
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 450 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 450 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 1200 },
+    ],
+    'HELP': [
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 450 },
+      { on: true, dur: 160 }, { on: false, dur: 450 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 450 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 1200 },
+    ],
+    'NOTHING': [
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 450 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 1200 },
+    ],
+    'OK': [
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 450 },
+      { on: true, dur: 450 }, { on: false, dur: 160 },
+      { on: true, dur: 160 }, { on: false, dur: 160 },
+      { on: true, dur: 450 }, { on: false, dur: 1200 },
+    ],
+  };
+
+  const handleToggleMorse = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (activeMode === 'morse') {
+      stopAll();
+    } else {
+      stopAll();
+      setActiveMode('morse');
+      setIsMorseRunning(true);
+      startMorsePlayback(morsePreset);
+    }
+  };
+
+  const handleSelectMorsePreset = (key) => {
+    setMorsePreset(key);
+    Haptics.selectionAsync().catch(() => {});
+    if (activeMode === 'morse') {
+      if (morseTimerRef.current) clearTimeout(morseTimerRef.current);
+      startMorsePlayback(key);
+    }
+  };
+
+  const startMorsePlayback = (presetKey) => {
+    if (morseTimerRef.current) clearTimeout(morseTimerRef.current);
+    const pattern = MORSE_PATTERNS[presetKey] || MORSE_PATTERNS['SOS'];
+    let stepIdx = 0;
+
+    const playStep = () => {
+      if (stepIdx >= pattern.length) {
+        stepIdx = 0;
+      }
+      const item = pattern[stepIdx];
+      setCurrentMorseIndex(stepIdx);
+
+      if (item.on) {
+        if (onBrightnessChange) onBrightnessChange([255, 255, 255]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      } else {
+        if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+      }
+
+      stepIdx++;
+      morseTimerRef.current = setTimeout(playStep, item.dur);
+    };
+
+    playStep();
+  };
+
+  // 9. Precision Timing Arcade Game («МЕТКИЙ ГЛИФ»)
+  const handleTogglePrecision = () => {
+    if (activeMode === 'precision' && isPrecisionRunning) {
+      stopAll();
+    } else {
+      startPrecisionGame();
+    }
+  };
+
+  const startPrecisionGame = () => {
+    stopAll();
+    setActiveMode('precision');
+    setIsPrecisionRunning(true);
+    setPrecisionScore(0);
+    setPrecisionStreak(1);
+    setPrecisionLives(3);
+    setPrecisionGameOver(false);
+
+    precisionScoreRef.current = 0;
+    precisionStreakRef.current = 1;
+    precisionLivesRef.current = 3;
+    precisionSpeedRef.current = 80;
+
+    const newTarget = Math.floor(Math.random() * 36);
+    setPrecisionTarget(newTarget);
+    precisionTargetRef.current = newTarget;
+
+    precisionRunnerRef.current = (newTarget + 18) % 36;
+    setPrecisionRunner(precisionRunnerRef.current);
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    runPrecisionLoop();
+  };
+
+  const runPrecisionLoop = () => {
+    precisionRunnerRef.current = (precisionRunnerRef.current + 1) % 36;
+    setPrecisionRunner(precisionRunnerRef.current);
+
+    const target = precisionTargetRef.current;
+    const runner = precisionRunnerRef.current;
+
+    // Show both target and runner on the camera silhouette
+    if (onActivePixelChange) {
+      onActivePixelChange([target, runner]);
+    }
+
+    precisionTimerRef.current = setTimeout(runPrecisionLoop, precisionSpeedRef.current);
+  };
+
+  const handlePrecisionCatch = () => {
+    if (!isPrecisionRunning) {
+      startPrecisionGame();
+      return;
+    }
+
+    const runner = precisionRunnerRef.current;
+    const target = precisionTargetRef.current;
+    const diff = Math.min(Math.abs(runner - target), 36 - Math.abs(runner - target));
+
+    if (diff === 0) {
+      // Direct Bullseye Hit!
+      const bonus = 100 * precisionStreakRef.current;
+      precisionScoreRef.current += bonus;
+      setPrecisionScore(precisionScoreRef.current);
+
+      precisionStreakRef.current = Math.min(5, precisionStreakRef.current + 1);
+      setPrecisionStreak(precisionStreakRef.current);
+
+      // Speed increases (delay reduces from 80ms down to 24ms)
+      precisionSpeedRef.current = Math.max(24, precisionSpeedRef.current - 4);
+
+      if (precisionScoreRef.current > precisionBestScore) {
+        setPrecisionBestScore(precisionScoreRef.current);
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      // Victory burst on arcs
+      if (onBrightnessChange) {
+        onBrightnessChange([255, 255, 255]);
+        setTimeout(() => onBrightnessChange && onBrightnessChange([0, 0, 0]), 90);
+      }
+
+      // Pick next target separated by at least 6 LEDs
+      let nextTarget = Math.floor(Math.random() * 36);
+      while (Math.min(Math.abs(nextTarget - runner), 36 - Math.abs(nextTarget - runner)) < 6) {
+        nextTarget = Math.floor(Math.random() * 36);
+      }
+      precisionTargetRef.current = nextTarget;
+      setPrecisionTarget(nextTarget);
+    } else if (diff <= 1) {
+      // Near Hit!
+      const bonus = 40;
+      precisionScoreRef.current += bonus;
+      setPrecisionScore(precisionScoreRef.current);
+
+      if (precisionScoreRef.current > precisionBestScore) {
+        setPrecisionBestScore(precisionScoreRef.current);
+      }
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+      let nextTarget = Math.floor(Math.random() * 36);
+      while (Math.min(Math.abs(nextTarget - runner), 36 - Math.abs(nextTarget - runner)) < 6) {
+        nextTarget = Math.floor(Math.random() * 36);
+      }
+      precisionTargetRef.current = nextTarget;
+      setPrecisionTarget(nextTarget);
+    } else {
+      // Missed!
+      precisionLivesRef.current -= 1;
+      setPrecisionLives(precisionLivesRef.current);
+      precisionStreakRef.current = 1;
+      setPrecisionStreak(1);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+
+      if (precisionLivesRef.current <= 0) {
+        // Game Over!
+        if (precisionTimerRef.current) clearTimeout(precisionTimerRef.current);
+        setIsPrecisionRunning(false);
+        setPrecisionGameOver(true);
+        if (onActivePixelChange) onActivePixelChange(null);
+        if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+      }
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (strobeTimerRef.current) clearInterval(strobeTimerRef.current);
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
       if (reflexTimerRef.current) clearTimeout(reflexTimerRef.current);
+      if (breathTimerRef.current) clearInterval(breathTimerRef.current);
+      if (morseTimerRef.current) clearTimeout(morseTimerRef.current);
+      if (precisionTimerRef.current) clearTimeout(precisionTimerRef.current);
       if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
       if (onActivePixelChange) onActivePixelChange(null);
+      if (onPixelLevelsChange) onPixelLevelsChange(null);
     };
   }, []);
 
@@ -300,36 +617,7 @@ export default function UtilitiesScreen({
       showsVerticalScrollIndicator={false}
     >
       {/* ============================================================ */}
-      {/* 1. SOFTLIGHT FLASHLIGHT                                      */}
-      {/* ============================================================ */}
-      <LiquidGlassCard isActive={activeMode === 'softlight'}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>ФОНАРИК (SOFTLIGHT)</Text>
-          <TouchableOpacity
-            style={[styles.btn, activeMode === 'softlight' && styles.btnActive]}
-            onPress={handleToggleSoftlight}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.btnText, activeMode === 'softlight' && styles.btnTextActive]}>
-              {activeMode === 'softlight' ? 'ВЫКЛ' : 'ВКЛ'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <GlyphSlider
-          label="ЯРКОСТЬ ФОНАРИКА"
-          value={softlightLevel}
-          min={10}
-          max={255}
-          step={1}
-          displayValue={`${Math.round((softlightLevel / 255) * 100)}%`}
-          accentColor="#FFFFFF"
-          onValueChange={handleSoftlightLevelChange}
-        />
-      </LiquidGlassCard>
-
-      {/* ============================================================ */}
-      {/* 2. STROBE BEACON                                             */}
+      {/* 1. STROBE BEACON                                             */}
       {/* ============================================================ */}
       <LiquidGlassCard isActive={activeMode === 'strobe'}>
         <View style={styles.cardHeader}>
@@ -443,20 +731,155 @@ export default function UtilitiesScreen({
           max={100}
           step={1}
           unit="%"
-          displayValue={`${batteryLevel}%`}
+          displayValue={`${batteryLevel}% (${Math.round((batteryLevel / 100) * 36)} / 36 LED)`}
           accentColor="#00E5FF"
           onValueChange={handleBatteryLevelChange}
         />
       </LiquidGlassCard>
 
       {/* ============================================================ */}
-      {/* 5. ARCADE MINI-GAMES                                         */}
+      {/* 5. ZEN BREATHING 4-7-8                                       */}
+      {/* ============================================================ */}
+      <LiquidGlassCard isActive={activeMode === 'breath'}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>
+            {isBreathing
+              ? `ДЫХАНИЕ: ${breathPhase === 'INHALE' ? 'ВДОХ' : breathPhase === 'HOLD' ? 'ЗАДЕРЖКА' : 'ВЫДОХ'} (${breathSeconds} С)`
+              : 'ДЫХАНИЕ ZEN (4-7-8)'}
+          </Text>
+          <TouchableOpacity
+            style={[styles.btn, isBreathing && styles.btnActive]}
+            onPress={handleToggleBreath}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.btnText, isBreathing && styles.btnTextActive]}>
+              {isBreathing ? 'СТОП' : 'СТАРТ'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.breathInfoRow}>
+          <View style={[styles.breathPhaseBadge, isBreathing && breathPhase === 'INHALE' && styles.breathPhaseBadgeActive]}>
+            <Text style={[styles.breathPhaseText, isBreathing && breathPhase === 'INHALE' && styles.breathPhaseTextActive]}>
+              ВДОХ 4С
+            </Text>
+          </View>
+          <View style={[styles.breathPhaseBadge, isBreathing && breathPhase === 'HOLD' && styles.breathPhaseBadgeActive]}>
+            <Text style={[styles.breathPhaseText, isBreathing && breathPhase === 'HOLD' && styles.breathPhaseTextActive]}>
+              ЗАДЕРЖКА 7С
+            </Text>
+          </View>
+          <View style={[styles.breathPhaseBadge, isBreathing && breathPhase === 'EXHALE' && styles.breathPhaseBadgeActive]}>
+            <Text style={[styles.breathPhaseText, isBreathing && breathPhase === 'EXHALE' && styles.breathPhaseTextActive]}>
+              ВЫДОХ 8С
+            </Text>
+          </View>
+          {isBreathing && (
+            <Text style={styles.breathCycleCount}>#{breathCycle}</Text>
+          )}
+        </View>
+      </LiquidGlassCard>
+
+      {/* ============================================================ */}
+      {/* 6. TACTICAL MORSE BEACON                                     */}
+      {/* ============================================================ */}
+      <LiquidGlassCard isActive={activeMode === 'morse'}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>МАЯК МОРЗЕ (ITU-R)</Text>
+          <TouchableOpacity
+            style={[styles.btn, isMorseRunning && styles.btnActive]}
+            onPress={handleToggleMorse}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.btnText, isMorseRunning && styles.btnTextActive]}>
+              {isMorseRunning ? 'СТОП' : 'МАЯК'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.presetsRow}>
+          {['SOS', 'HELP', 'NOTHING', 'OK'].map((key) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.smallPresetBtn,
+                morsePreset === key && styles.smallPresetBtnActive,
+              ]}
+              onPress={() => handleSelectMorsePreset(key)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.smallPresetText,
+                  morsePreset === key && styles.smallPresetTextActive,
+                ]}
+              >
+                {key}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </LiquidGlassCard>
+
+      {/* ============================================================ */}
+      {/* 7. ARCADE MINI-GAMES                                         */}
       {/* ============================================================ */}
       <View style={styles.arcadeHeaderRow}>
         <Text style={styles.arcadeSectionTitle}>АРКАДНЫЕ ИГРЫ GLYPH</Text>
       </View>
 
-      {/* GAME 1: SPIN THE BOTTLE (СВЕТОВАЯ БУТЫЛОЧКА) */}
+      {/* GAME 1: PRECISION TIMING ARCADE («МЕТКИЙ ГЛИФ») */}
+      <LiquidGlassCard isActive={activeMode === 'precision'}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>МЕТКИЙ ГЛИФ (АРКАДА)</Text>
+          <View style={styles.arcadeStatsRow}>
+            <View style={styles.scorePill}>
+              <Text style={styles.scorePillText}>СЧЁТ: {precisionScore}</Text>
+            </View>
+            <View style={[styles.streakPill, precisionStreak > 1 && styles.streakPillActive]}>
+              <Text style={[styles.streakPillText, precisionStreak > 1 && styles.streakPillTextActive]}>
+                x{precisionStreak}
+              </Text>
+            </View>
+            <Text style={styles.livesText}>
+              {'❤'.repeat(Math.max(0, precisionLives))}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.precisionArcadeBtn,
+            isPrecisionRunning && styles.precisionArcadeBtnActive,
+            precisionGameOver && styles.precisionArcadeBtnGameOver,
+          ]}
+          onPress={handlePrecisionCatch}
+          activeOpacity={0.8}
+        >
+          <Text
+            style={[
+              styles.precisionBtnMainText,
+              isPrecisionRunning && styles.precisionBtnMainTextActive,
+            ]}
+          >
+            {!isPrecisionRunning && !precisionGameOver && '▶ НАЧАТЬ ИГРУ'}
+            {isPrecisionRunning && '🎯 ПОЙМАТЬ МИШЕНЬ!'}
+            {precisionGameOver && `ИГРА ОКОНЧЕНА (${precisionScore} ОЧКОВ) • ЗАНОВО`}
+          </Text>
+          {isPrecisionRunning && (
+            <Text style={styles.precisionBtnSubText}>
+              МИШЕНЬ: LED #{precisionTarget} • ЛУЧ: LED #{precisionRunner}
+            </Text>
+          )}
+          {precisionBestScore > 0 && !isPrecisionRunning && (
+            <Text style={styles.precisionBtnSubText}>
+              РЕКОРД СЕССИИ: {precisionBestScore} ОЧКОВ
+            </Text>
+          )}
+        </TouchableOpacity>
+      </LiquidGlassCard>
+
+      {/* GAME 2: SPIN THE BOTTLE (СВЕТОВАЯ БУТЫЛОЧКА) */}
       <LiquidGlassCard isActive={activeMode === 'roulette'}>
         <View style={styles.rouletteBox}>
           <View style={styles.cardHeader}>
@@ -559,7 +982,8 @@ const styles = StyleSheet.create({
   btn: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderTopColor: 'rgba(255, 255, 255, 0.38)',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -567,6 +991,10 @@ const styles = StyleSheet.create({
   btnActive: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
   },
   btnText: {
     fontFamily: 'NDOT57',
@@ -585,16 +1013,21 @@ const styles = StyleSheet.create({
   },
   smallPresetBtn: {
     flex: 1,
-    paddingVertical: 5,
+    paddingVertical: 5.5,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
   },
   smallPresetBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.60)',
+    borderTopColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.20,
+    shadowRadius: 5,
   },
   smallPresetText: {
     fontFamily: 'NDOT57',
@@ -625,9 +1058,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderTopColor: 'rgba(255, 255, 255, 0.30)',
     alignItems: 'center',
   },
   resultBadgeText: {
@@ -639,6 +1073,8 @@ const styles = StyleSheet.create({
   bestTimeBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.35)',
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -651,9 +1087,10 @@ const styles = StyleSheet.create({
   reflexPad: {
     height: 110,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
@@ -689,5 +1126,132 @@ const styles = StyleSheet.create({
     color: '#8E8E98',
     letterSpacing: 1,
     marginTop: 6,
+  },
+  // Breath & Morse Styles
+  breathInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  breathPhaseBadge: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+  },
+  breathPhaseBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+  },
+  breathPhaseText: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#8E8E98',
+    letterSpacing: 0.6,
+  },
+  breathPhaseTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  breathCycleCount: {
+    fontFamily: 'NDOT57',
+    fontSize: 9,
+    color: GlyphColors.neonCyan,
+    letterSpacing: 0.8,
+    paddingHorizontal: 4,
+  },
+  // Precision Timing Arcade Styles
+  arcadeStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  scorePill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  scorePillText: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+  },
+  streakPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  streakPillActive: {
+    backgroundColor: 'rgba(255, 215, 0, 0.20)',
+    borderColor: '#FFD700',
+  },
+  streakPillText: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#8E8E98',
+    letterSpacing: 0.6,
+  },
+  streakPillTextActive: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+  },
+  livesText: {
+    fontSize: 10,
+    color: GlyphColors.nothingRed,
+    letterSpacing: 1,
+  },
+  precisionArcadeBtn: {
+    height: 72,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderTopColor: 'rgba(255, 255, 255, 0.40)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  precisionArcadeBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  precisionArcadeBtnGameOver: {
+    backgroundColor: 'rgba(215, 25, 32, 0.18)',
+    borderColor: GlyphColors.nothingRed,
+  },
+  precisionBtnMainText: {
+    fontFamily: 'NDOT57',
+    fontSize: 13,
+    color: '#FFFFFF',
+    letterSpacing: 1.4,
+  },
+  precisionBtnMainTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  precisionBtnSubText: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#8E8E98',
+    letterSpacing: 0.8,
   },
 });

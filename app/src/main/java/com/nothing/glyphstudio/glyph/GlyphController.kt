@@ -718,7 +718,7 @@ object GlyphController {
     val autoWalkSpeedMs = kotlinx.coroutines.flow.MutableStateFlow(80L)
 
     fun setAutoWalkSpeed(speedMs: Long) {
-        autoWalkSpeedMs.value = speedMs.coerceIn(20L, 500L)
+        autoWalkSpeedMs.value = speedMs.coerceIn(1L, 500L)
     }
 
     fun startAutoWalk(scope: CoroutineScope, brightness: Int = 255) {

@@ -18,6 +18,7 @@ app/build/
 
 # OS & Temporary
 tools/
+.agents/
 .DS_Store
 Thumbs.db
 *.log

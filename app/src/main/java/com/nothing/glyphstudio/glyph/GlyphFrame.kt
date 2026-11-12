@@ -31,7 +31,7 @@ data class GlyphFrame(
 data class StepTrack(
     val channelId: Int,
     val name: String,
-    val steps: MutableList<Int> = MutableList(16) { 0 }
+    val steps: MutableList<Int> = MutableList(8) { 0 }
 )
 
 /**
@@ -42,7 +42,7 @@ data class GlyphSequence(
     val name: String = "Untitled Beat",
     val author: String = "Creator",
     val bpm: Int = 120,
-    val stepCount: Int = 16,
+    val stepCount: Int = 8,
     val device: String = NothingDevice.PHONE_3A_PRO.name,
     val tracks: List<StepTrack> = emptyList(),
     val loop: Boolean = true,

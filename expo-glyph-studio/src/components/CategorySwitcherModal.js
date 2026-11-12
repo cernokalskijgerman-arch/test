@@ -26,11 +26,13 @@ export default function CategorySwitcherModal({
   onClose,
   stats = {},
 }) {
+  const [shouldRender, setShouldRender] = React.useState(visible);
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
+      setShouldRender(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -44,7 +46,7 @@ export default function CategorySwitcherModal({
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
+    } else if (shouldRender) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -56,11 +58,13 @@ export default function CategorySwitcherModal({
           duration: 160,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        setShouldRender(false);
+      });
     }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   const handleSelect = (index) => {
     Haptics.selectionAsync().catch(() => {});

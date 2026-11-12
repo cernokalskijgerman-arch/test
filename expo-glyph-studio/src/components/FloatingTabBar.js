@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Platform,
   Dimensions,
   Pressable,
+  PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -80,12 +81,11 @@ export function FloatingTabBar({
     transform: [{ translateX: translateX.value }],
   }));
 
-  const handlePress = (index) => {
+  const handlePress = useCallback((index) => {
     const isFocused = activeIndex === index;
 
     if (isFocused) {
-      // Re-tap on active tab: provide subtle tactile pulse feedback, completely smooth, NO FREEZING!
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      // Re-tap on active tab: safely do nothing, never open unwanted popup modals
       return;
     }
 
@@ -105,7 +105,60 @@ export function FloatingTabBar({
     } else if (onSelectTab) {
       onSelectTab(index);
     }
-  };
+  }, [activeIndex, state, navigation, onSelectTab]);
+
+  // Real-time Scrubbing / Drag-to-Select (Зажатие и наведение на нужный пункт)
+  const lastActiveIndexRef = useRef(activeIndex);
+  lastActiveIndexRef.current = activeIndex;
+
+  const widthRef = useRef(INNER_WIDTH);
+  widthRef.current = INNER_WIDTH;
+
+  const tabCountRef = useRef(tabCount);
+  tabCountRef.current = tabCount;
+
+  const isScrubbingRef = useRef(false);
+
+  const calculateIndexFromLocation = useCallback((x) => {
+    const w = widthRef.current > 0 ? widthRef.current : (width - paddingHorizontal * 2 - 2);
+    const count = tabCountRef.current || 5;
+    const tabW = w / count;
+    const idx = Math.floor(x / tabW);
+    return Math.max(0, Math.min(count - 1, idx));
+  }, [paddingHorizontal]);
+
+  const scrubResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
+      onPanResponderGrant: (evt) => {
+        isScrubbingRef.current = false;
+        const x = evt.nativeEvent.locationX;
+        const target = calculateIndexFromLocation(x);
+        if (target !== lastActiveIndexRef.current) {
+          lastActiveIndexRef.current = target;
+          handlePress(target);
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        isScrubbingRef.current = true;
+        const x = evt.nativeEvent.locationX;
+        const target = calculateIndexFromLocation(x);
+        if (target !== lastActiveIndexRef.current) {
+          lastActiveIndexRef.current = target;
+          handlePress(target);
+        }
+      },
+      onPanResponderRelease: () => {
+        isScrubbingRef.current = false;
+      },
+      onPanResponderTerminate: () => {
+        isScrubbingRef.current = false;
+      },
+    })
+  ).current;
 
   const bottomOffset = Platform.OS === 'ios'
     ? Math.max(insets?.bottom || 0, 16) + 4
@@ -145,6 +198,7 @@ export function FloatingTabBar({
             backgroundColor: 'rgba(14, 16, 24, 0.68)',
           },
         ]}
+        {...scrubResponder.panHandlers}
       >
         {/* Specular physical reflection gradient sheen */}
         <LinearGradient
@@ -210,7 +264,6 @@ export function FloatingTabBar({
               color={color}
               label={label}
               IconComponent={IconComponent}
-              onPress={() => handlePress(index)}
               tabWidth={TAB_WIDTH}
             />
           );
@@ -225,10 +278,8 @@ function TabItem({
   color,
   label,
   IconComponent,
-  onPress,
   tabWidth,
 }) {
-  const scale = useSharedValue(1);
   const iconScale = useSharedValue(isFocused ? 1.0 : 0.85);
 
   useEffect(() => {
@@ -239,32 +290,16 @@ function TabItem({
     });
   }, [isFocused]);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: iconScale.value }],
   }));
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.92, { mass: 0.3, damping: 15, stiffness: 400 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { mass: 0.3, damping: 15, stiffness: 400 });
-  };
-
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={isFocused ? { selected: true } : {}}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <View
+      pointerEvents="none"
       style={[styles.tab, { width: tabWidth }]}
     >
-      <Animated.View style={[styles.tabContent, animStyle]}>
+      <View style={styles.tabContent}>
         <Animated.View style={iconAnimStyle}>
           {IconComponent && (
             <IconComponent
@@ -280,8 +315,8 @@ function TabItem({
             {label}
           </Text>
         )}
-      </Animated.View>
-    </Pressable>
+      </View>
+    </View>
   );
 }
 

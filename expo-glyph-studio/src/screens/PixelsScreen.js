@@ -30,9 +30,11 @@ export default function PixelsScreen({
 
   const modes = [
     { id: 'forward', label: 'ВПЕРЕД' },
+    { id: 'comet', label: 'КОМЕТА' },
     { id: 'reverse', label: 'НАЗАД' },
     { id: 'pingpong', label: 'МАЯТНИК' },
     { id: 'random', label: 'ИСКРЫ' },
+    { id: 'shimmer', label: 'БЛЕСК' },
   ];
 
   return (
@@ -93,13 +95,17 @@ export default function PixelsScreen({
         <GlyphSlider
           label="СКОРОСТЬ ШАГА АНИМАЦИИ"
           value={autoWalkSpeed}
-          min={5}
+          min={1}
           max={200}
-          step={5}
+          step={1}
           unit=" мс"
           displayValue={
-            autoWalkSpeed <= 10
+            autoWalkSpeed === 1
+              ? '1 мс (ГИПЕР)'
+              : autoWalkSpeed <= 5
               ? `${autoWalkSpeed} мс (ТУРБО)`
+              : autoWalkSpeed <= 20
+              ? `${autoWalkSpeed} мс (БЫСТРО)`
               : `${autoWalkSpeed} мс / шаг`
           }
           accentColor={GlyphColors.neonCyan}
@@ -111,12 +117,13 @@ export default function PixelsScreen({
         {/* Speed Presets */}
         <View style={styles.speedPresetsRow}>
           {[
+            { label: '1мс ГИПЕР', val: 1 },
             { label: '5мс ТУРБО', val: 5 },
             { label: '20мс БЫСТРО', val: 20 },
             { label: '60мс СТАНДАРТ', val: 60 },
             { label: '120мс ПЛАВНО', val: 120 },
           ].map((item) => {
-            const isSelected = Math.abs(autoWalkSpeed - item.val) < 6;
+            const isSelected = autoWalkSpeed === item.val;
             return (
               <TouchableOpacity
                 key={item.label}
@@ -132,6 +139,7 @@ export default function PixelsScreen({
                     styles.speedPresetText,
                     isSelected && styles.speedPresetTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   {item.label}
                 </Text>
@@ -167,18 +175,27 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   autoWalkBtn: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderRadius: 9,
     paddingHorizontal: 14,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderTopColor: 'rgba(255, 255, 255, 0.45)',
   },
   autoWalkBtnActive: {
     backgroundColor: GlyphColors.neonCyan,
+    borderColor: '#FFFFFF',
+    shadowColor: GlyphColors.neonCyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 4,
   },
   autoWalkBtnText: {
     fontFamily: 'NDOT57',
     fontSize: 9,
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: 0.8,
   },
   autoWalkBtnTextActive: {
@@ -187,28 +204,36 @@ const styles = StyleSheet.create({
   },
   modesRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
     marginBottom: 8,
   },
   modeBtn: {
-    flex: 1,
+    flexBasis: '31%',
+    flexGrow: 1,
     paddingVertical: 7,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 8,
   },
   modeBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.20)',
-    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.60)',
+    borderTopColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.20,
+    shadowRadius: 6,
   },
   modeBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
+    fontSize: 8,
     color: '#8E8E98',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   modeBtnTextActive: {
     color: '#FFFFFF',
@@ -216,31 +241,37 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginVertical: 10,
   },
   speedPresetsRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     marginTop: 8,
   },
   speedPresetBtn: {
     flex: 1,
     paddingVertical: 7,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 8,
   },
   speedPresetBtnActive: {
     backgroundColor: 'rgba(0, 229, 255, 0.22)',
     borderColor: GlyphColors.neonCyan,
+    borderTopColor: '#FFFFFF',
+    shadowColor: GlyphColors.neonCyan,
+    shadowOpacity: 0.40,
+    shadowRadius: 6,
   },
   speedPresetText: {
     fontFamily: 'NDOT57',
-    fontSize: 7.5,
+    fontSize: 7,
     color: '#8E8E98',
   },
   speedPresetTextActive: {

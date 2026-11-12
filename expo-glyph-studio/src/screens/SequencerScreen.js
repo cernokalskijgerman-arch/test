@@ -10,47 +10,49 @@ import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from '../components/LiquidGlassCard';
 import { GlyphColors } from '../theme/colors';
 
+const STEP_COUNT = 8;
+
 const PRESETS = {
   cyber: {
     name: 'CYBER',
-    topleft: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
-    bottomleft: [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
-    right: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    topleft:    [1, 0, 0, 1, 0, 0, 1, 0],
+    bottomleft: [0, 0, 1, 0, 0, 1, 0, 0],
+    right:      [1, 0, 1, 0, 1, 0, 1, 0],
     bpm: 128,
   },
   heartbeat: {
     name: 'PULSE',
-    topleft: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
-    bottomleft: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
-    right: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
+    topleft:    [1, 1, 0, 0, 1, 1, 0, 0],
+    bottomleft: [1, 1, 0, 0, 1, 1, 0, 0],
+    right:      [1, 1, 0, 0, 1, 1, 0, 0],
     bpm: 90,
   },
   strobe: {
     name: 'STROBE',
-    topleft: [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    bottomleft: [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    right: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    topleft:    [1, 0, 1, 0, 1, 0, 1, 0],
+    bottomleft: [0, 1, 0, 1, 0, 1, 0, 1],
+    right:      [1, 0, 0, 0, 1, 0, 0, 0],
     bpm: 140,
   },
   techno: {
     name: 'TECHNO',
-    topleft: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1],
-    bottomleft: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-    right: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0],
+    topleft:    [1, 0, 0, 0, 1, 0, 0, 0],
+    bottomleft: [0, 0, 1, 0, 0, 0, 1, 0],
+    right:      [0, 1, 0, 1, 0, 1, 0, 1],
     bpm: 134,
   },
   echo: {
     name: 'ECHO',
-    topleft: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    bottomleft: [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    right: [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+    topleft:    [1, 0, 0, 0, 0, 1, 0, 0],
+    bottomleft: [0, 0, 1, 0, 0, 0, 0, 1],
+    right:      [0, 0, 0, 0, 1, 0, 0, 0],
     bpm: 110,
   },
 };
 
 /**
  * Screen 3: «СЕКВЕНСОР» (Матрица полей)
- * Compact 16-step rhythmic pattern matrix across all 3 Glyph arcs.
+ * Compact 8-step rhythmic pattern matrix across all 3 Glyph arcs.
  * Fits on a single screen without vertical scrolling.
  */
 export default function SequencerScreen({ brightness, onBrightnessChange }) {
@@ -87,21 +89,23 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
     Haptics.selectionAsync().catch(() => {});
     setActivePreset(presetKey);
     const p = PRESETS[presetKey];
-    setTracks({
-      topleft: [...p.topleft],
-      bottomleft: [...p.bottomleft],
-      right: [...p.right],
-    });
-    setBpm(p.bpm);
+    if (p) {
+      setTracks({
+        topleft: (p.topleft || []).slice(0, STEP_COUNT),
+        bottomleft: (p.bottomleft || []).slice(0, STEP_COUNT),
+        right: (p.right || []).slice(0, STEP_COUNT),
+      });
+      if (p.bpm) setBpm(p.bpm);
+    }
   };
 
   const clearAll = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     setActivePreset(null);
     setTracks({
-      topleft: new Array(16).fill(0),
-      bottomleft: new Array(16).fill(0),
-      right: new Array(16).fill(0),
+      topleft: new Array(STEP_COUNT).fill(0),
+      bottomleft: new Array(STEP_COUNT).fill(0),
+      right: new Array(STEP_COUNT).fill(0),
     });
     if (onBrightnessChange) {
       onBrightnessChange([0, 0, 0]);
@@ -135,7 +139,7 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
         onBrightnessChange([bTL, bBL, bR]);
       }
 
-      currentStepRef.current = (step + 1) % 16;
+      currentStepRef.current = (step + 1) % STEP_COUNT;
       setCurrentStep(currentStepRef.current);
     }, stepMs);
 
@@ -204,7 +208,7 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
           {/* Step Indicator */}
           <View style={styles.stepCounterBox}>
             <Text style={styles.stepCounterText}>
-              {isPlaying ? `${currentStep + 1}/16` : '16 ШАГОВ'}
+              {isPlaying ? `${currentStep + 1}/8` : '8 ШАГОВ'}
             </Text>
           </View>
 
@@ -236,17 +240,17 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
       </LiquidGlassCard>
 
       {/* ============================================================ */}
-      {/* 2. 16-STEP RHYTHM MATRIX (3 TRACKS)                          */}
+      {/* 2. 8-STEP RHYTHM MATRIX (3 TRACKS)                           */}
       {/* ============================================================ */}
       <LiquidGlassCard style={styles.matrixCard}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal={false} showsHorizontalScrollIndicator={false}>
           <View style={styles.matrix}>
             {/* Step header markers */}
             <View style={styles.stepHeaderRow}>
               <View style={styles.trackLabelBox}>
                 <Text style={styles.headerLabel}>ДОРОЖКА</Text>
               </View>
-              {Array.from({ length: 16 }).map((_, i) => (
+              {Array.from({ length: STEP_COUNT }).map((_, i) => (
                 <View
                   key={i}
                   style={[
@@ -351,18 +355,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   playBtn: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderTopColor: 'rgba(255, 255, 255, 0.45)',
   },
   playBtnActive: {
     backgroundColor: GlyphColors.neonRed,
+    borderColor: '#FFFFFF',
+    shadowColor: GlyphColors.neonRed,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
   },
   playBtnText: {
     fontFamily: 'NDOT57',
     fontSize: 9.5,
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: 0.8,
   },
   playBtnTextActive: {
@@ -374,7 +385,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 3,
@@ -398,6 +410,9 @@ const styles = StyleSheet.create({
   },
   stepCounterBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderTopColor: 'rgba(255, 255, 255, 0.20)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 5,
@@ -414,7 +429,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
   },
   clearBtnText: {
     fontFamily: 'NDOT57',
@@ -433,11 +449,16 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
   },
   presetBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.20)',
-    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.60)',
+    borderTopColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.20,
+    shadowRadius: 5,
   },
   presetBtnText: {
     fontFamily: 'NDOT57',
@@ -461,7 +482,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   trackLabelBox: {
-    width: 68,
+    width: 64,
     justifyContent: 'center',
   },
   headerLabel: {
@@ -471,12 +492,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   stepNumBox: {
-    width: 22,
-    height: 18,
-    marginHorizontal: 2,
+    width: 28,
+    height: 20,
+    marginHorizontal: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 5,
     backgroundColor: 'transparent',
   },
   stepNumQuarter: {
@@ -485,11 +506,11 @@ const styles = StyleSheet.create({
   },
   stepNumActive: {
     backgroundColor: GlyphColors.neonRed,
-    borderRadius: 4,
+    borderRadius: 5,
   },
   stepNumText: {
     fontFamily: 'NDOT57',
-    fontSize: 7.5,
+    fontSize: 8,
     color: '#555565',
   },
   stepNumTextActive: {
@@ -507,25 +528,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   stepCell: {
-    width: 22,
-    height: 26,
-    marginHorizontal: 2,
-    borderRadius: 5,
+    width: 28,
+    height: 28,
+    marginHorizontal: 2.5,
+    borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderTopColor: 'rgba(255, 255, 255, 0.28)',
   },
   stepCellOn: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.75,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.85,
+    shadowRadius: 8,
+    elevation: 5,
   },
   stepCellPlaying: {
     borderColor: GlyphColors.neonRed,
     borderWidth: 1.8,
+    shadowColor: GlyphColors.neonRed,
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
   },
 });

@@ -76,9 +76,9 @@ fun SequencerScreen(
     // Track 0: Top-Left Arc (0..11)
     // Track 1: Bottom-Left Arc (12..17)
     // Track 2: Right Arc (18..32)
-    val trackTopLeft = remember { mutableStateListOf(*Array(16) { if (it % 4 == 0) 255 else 0 }) }
-    val trackBottomLeft = remember { mutableStateListOf(*Array(16) { if (it % 4 == 2) 220 else 0 }) }
-    val trackRight = remember { mutableStateListOf(*Array(16) { if (it % 2 == 0) 255 else 0 }) }
+    val trackTopLeft = remember { mutableStateListOf(*Array(8) { if (it % 4 == 0) 255 else 0 }) }
+    val trackBottomLeft = remember { mutableStateListOf(*Array(8) { if (it % 4 == 2) 220 else 0 }) }
+    val trackRight = remember { mutableStateListOf(*Array(8) { if (it % 2 == 0) 255 else 0 }) }
 
     LaunchedEffect(isPlaying, bpm) {
         if (!isPlaying) {
@@ -111,7 +111,7 @@ fun SequencerScreen(
 
             GlyphController.updateFrame(GlyphFrame(segmentBrightness = array))
             delay(stepDurationMs)
-            currentStep = (currentStep + 1) % 16
+            currentStep = (currentStep + 1) % 8
         }
     }
 
@@ -226,7 +226,7 @@ fun SequencerScreen(
                     )
 
                     IconButton(onClick = {
-                        for (i in 0 until 16) {
+                        for (i in 0 until 8) {
                             trackTopLeft[i] = 0
                             trackBottomLeft[i] = 0
                             trackRight[i] = 0
@@ -262,7 +262,7 @@ fun SequencerScreen(
                     Box(modifier = Modifier.width(82.dp)) {
                         Text("STEP", color = GlyphColors.TextDim, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                     }
-                    for (step in 0 until 16) {
+                    for (step in 0 until 8) {
                         val isHead = isPlaying && currentStep == step
                         Box(
                             modifier = Modifier

@@ -69,7 +69,8 @@ export const PIXEL_COORDINATES = (() => {
 
 export default function GlyphCameraSilhouette({
   brightness = [255, 255, 255], // [TL, BL, R] values 0..255
-  activePixel = null, // Optional single active pixel index (0..35)
+  activePixel = null, // Optional single active pixel index (0..35) or array of active indices
+  pixelLevels = null, // Optional array of 36 normalized float brightness values [0..1] for independent shimmer/glisten
   onArcPress,
   onPixelPress,
   size = 280,
@@ -234,7 +235,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bTL > 0.02 && activePixel === null && (
+        {bTL > 0.02 && activePixel === null && pixelLevels === null && (
           <G>
             {/* Outer soft bloom */}
             <Path
@@ -282,7 +283,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bBL > 0.02 && activePixel === null && (
+        {bBL > 0.02 && activePixel === null && pixelLevels === null && (
           <G>
             <Path
               d={pathBL}
@@ -327,7 +328,7 @@ export default function GlyphCameraSilhouette({
           strokeLinecap="round"
         />
         {/* Active Glowing White Tube */}
-        {bR > 0.02 && activePixel === null && (
+        {bR > 0.02 && activePixel === null && pixelLevels === null && (
           <G>
             <Path
               d={pathR}
@@ -363,12 +364,70 @@ export default function GlyphCameraSilhouette({
         />
 
         {/* ============================================================ */}
+        {/* 36 INDEPENDENTLY SHIMMERING GLYPH PIXELS (ПЛАВНЫЙ БЛЕСК)     */}
+        {/* ============================================================ */}
+        {pixelLevels !== null && Array.isArray(pixelLevels) && (
+          <G>
+            {PIXEL_COORDINATES.map((pixel) => {
+              const lvl = Math.max(0, Math.min(1, pixelLevels[pixel.id] ?? 0));
+              const bloomR = 4 + lvl * 10;
+              const glowR = 3 + lvl * 5;
+              const coreR = 1.8 + lvl * 2.8;
+
+              return (
+                <G key={pixel.id}>
+                  {lvl > 0.08 ? (
+                    <>
+                      {/* Outer Sparkle Bloom */}
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r={bloomR.toFixed(1)}
+                        fill={`rgba(255, 255, 255, ${(lvl * 0.40).toFixed(2)})`}
+                      />
+                      {/* Mid Neon Core Glow */}
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r={glowR.toFixed(1)}
+                        fill={`rgba(230, 245, 255, ${(lvl * 0.85).toFixed(2)})`}
+                      />
+                      {/* Solid White Star Core */}
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r={coreR.toFixed(1)}
+                        fill="#FFFFFF"
+                      />
+                    </>
+                  ) : (
+                    <Circle
+                      cx={pixel.x}
+                      cy={pixel.y}
+                      r="2"
+                      fill="rgba(255, 255, 255, 0.20)"
+                    />
+                  )}
+                </G>
+              );
+            })}
+          </G>
+        )}
+
+        {/* ============================================================ */}
         {/* 36 PHYSICAL MICRO-LEDS (STEPPER & AUTO-WALK INDICATION)      */}
         {/* ============================================================ */}
         {activePixel !== null && activePixel !== undefined && (
           <G>
             {PIXEL_COORDINATES.map((pixel) => {
-              const isActive = pixel.id === activePixel;
+              const isActive = Array.isArray(activePixel)
+                ? activePixel.includes(pixel.id)
+                : pixel.id === activePixel;
+
+              const isAdjacent = !Array.isArray(activePixel) && activePixel !== null && (
+                pixel.id === (activePixel + 1) % 36 || pixel.id === (activePixel - 1 + 36) % 36
+              );
+
               return (
                 <G key={pixel.id}>
                   {isActive ? (
@@ -391,6 +450,22 @@ export default function GlyphCameraSilhouette({
                         cy={pixel.y}
                         r="4.5"
                         fill="#FFFFFF"
+                      />
+                    </>
+                  ) : isAdjacent ? (
+                    <>
+                      {/* Sub-Pixel Bloom Trail */}
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r="6"
+                        fill="rgba(255, 255, 255, 0.20)"
+                      />
+                      <Circle
+                        cx={pixel.x}
+                        cy={pixel.y}
+                        r="3"
+                        fill="rgba(230, 245, 255, 0.50)"
                       />
                     </>
                   ) : (

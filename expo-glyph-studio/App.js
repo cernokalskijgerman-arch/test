@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import 'react-native-reanimated';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   SafeAreaView,
   View,
@@ -13,6 +14,7 @@ import {
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlyphColors } from './src/theme/colors';
 
@@ -29,13 +31,28 @@ import UtilitiesScreen from './src/screens/UtilitiesScreen';
 const TABS = [
   { id: 0, label: 'КОНТРОЛЬ', subtitle: 'Питание, яркость и 3 дуги' },
   { id: 1, label: 'АВТО-ОБХОД', subtitle: 'Бегущий свет 36 LED' },
-  { id: 2, label: 'СЕКВЕНСОР', subtitle: '16-шаговые ритмы' },
+  { id: 2, label: 'СЕКВЕНСОР', subtitle: '8-шаговые ритмы' },
   { id: 3, label: 'МУЗЫКА', subtitle: 'FFT визуализатор частот' },
   { id: 4, label: 'УТИЛИТЫ', subtitle: 'Фонарик, таймер, аркада' },
 ];
 
+// Calculate step delay normalized to physical arc angular span
+const calculateNormalizedStepDelay = (pixelIndex, baseDelayMs) => {
+  const meanDegPerLed = 110.0 / 33.0; // ~3.333 deg
+  let degPerLed = 3.333;
+  if (pixelIndex >= 0 && pixelIndex <= 19) {
+    degPerLed = 41.0 / 19.0; // Top-Left: ~2.158 deg (scale ~0.647)
+  } else if (pixelIndex >= 20 && pixelIndex <= 30) {
+    degPerLed = 48.0 / 10.0; // Right: 4.800 deg (scale ~1.440)
+  } else if (pixelIndex >= 31 && pixelIndex <= 35) {
+    degPerLed = 21.0 / 4.0;  // Bottom-Left: 5.250 deg (scale ~1.575)
+  }
+  const scale = degPerLed / meanDegPerLed;
+  return Math.max(1, Math.round(baseDelayMs * scale));
+};
+
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'NDOT57': require('./assets/fonts/Ndot57.otf'),
   });
 
@@ -46,15 +63,17 @@ export default function App() {
   const [brightness, setBrightness] = useState([255, 255, 255]);
   const [masterBrightness, setMasterBrightness] = useState(255);
   const [activePixel, setActivePixel] = useState(null);
+  const [pixelLevels, setPixelLevels] = useState(null); // Array of 36 independent float levels for smooth pixel shimmer
 
   // Auto-walk engine state
   const [isAutoWalk, setIsAutoWalk] = useState(false);
   const [autoWalkSpeed, setAutoWalkSpeed] = useState(80);
-  const [autoWalkMode, setAutoWalkMode] = useState('forward'); // 'forward' | 'reverse' | 'pingpong' | 'random'
+  const [autoWalkMode, setAutoWalkMode] = useState('forward'); // 'forward' | 'reverse' | 'pingpong' | 'random' | 'shimmer'
 
   // Screen transition animations
   const screenFadeAnim = useRef(new Animated.Value(1)).current;
   const screenTranslateX = useRef(new Animated.Value(0)).current;
+  const screenScaleAnim = useRef(new Animated.Value(1)).current;
 
   // Refs for real-time reactivity without re-render loop tearing
   const currentTabRef = useRef(currentTab);
@@ -78,19 +97,14 @@ export default function App() {
   const walkDirectionRef = useRef(1); // 1 = forward, -1 = reverse for pingpong
   const stepTimerRef = useRef(null);
   const stepStartTimeRef = useRef(0);
+  const shimmerTimeRef = useRef(0);
 
   // Toggle individual arc
   const handleArcPress = useCallback((arcIndex) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBrightness((prev) => {
       const next = [...prev];
-      const targetB = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
-      next[arcIndex] = next[arcIndex] > 0 ? 0 : targetB;
-
-      // Update master brightness to match max of active arcs
-      const maxB = Math.max(...next);
-      setMasterBrightness(maxB);
-      masterBrightnessRef.current = maxB;
+      next[arcIndex] = next[arcIndex] > 0 ? 0 : 255;
       return next;
     });
   }, []);
@@ -100,9 +114,6 @@ export default function App() {
     setBrightness((prev) => {
       const next = [...prev];
       next[arcIndex] = newVal;
-      const maxB = Math.max(...next);
-      setMasterBrightness(maxB);
-      masterBrightnessRef.current = maxB;
       return next;
     });
   }, []);
@@ -111,35 +122,24 @@ export default function App() {
   const handleMasterBrightnessChange = useCallback((newVal) => {
     setMasterBrightness(newVal);
     masterBrightnessRef.current = newVal;
-    if (newVal <= 0) {
-      setBrightness([0, 0, 0]);
-      setActivePixel(null);
-      if (isAutoWalkRef.current) {
-        setIsAutoWalk(false);
-      }
-    } else {
-      setBrightness((prev) => {
-        const isUniform = prev.every((b) => b === prev[0]);
-        if (isUniform) {
-          return [newVal, newVal, newVal];
-        }
-        const maxPrev = Math.max(...prev, 1);
-        return prev.map((b) => Math.round((b / maxPrev) * newVal));
-      });
-    }
   }, []);
 
   const handleAllOn = useCallback((val = 255) => {
-    const target = val > 0 ? val : (masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255);
+    const target = val > 0 ? val : 255;
     setMasterBrightness(target);
     masterBrightnessRef.current = target;
-    setBrightness([target, target, target]);
+    // Revive arcs only if all are currently 0; preserve custom balance otherwise
+    setBrightness((prev) => {
+      if (prev.every((b) => b === 0)) {
+        return [255, 255, 255];
+      }
+      return prev;
+    });
   }, []);
 
   const handleAllOff = useCallback(() => {
     setMasterBrightness(0);
     masterBrightnessRef.current = 0;
-    setBrightness([0, 0, 0]);
     setActivePixel(null);
     if (isAutoWalkRef.current) {
       setIsAutoWalk(false);
@@ -153,6 +153,9 @@ export default function App() {
     if (pixelId === null) {
       const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
       setBrightness([b, b, b]);
+    } else if (Array.isArray(pixelId)) {
+      // Array of discrete active micro-LEDs (e.g. sequential battery indicator)
+      setBrightness([0, 0, 0]);
     } else {
       const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
       let arc = 0;
@@ -165,23 +168,105 @@ export default function App() {
     }
   }, []);
 
-  // Auto-walk single step executor
+  // Direct pixel levels controller (for games and animations with variable LED brightness)
+  const handlePixelLevelsChange = useCallback((levels) => {
+    setPixelLevels(levels);
+    if (levels !== null) {
+      setActivePixel(null);
+      activePixelRef.current = null;
+    }
+  }, []);
+
+  // Auto-walk step executor with angular normalization, turbo multi-stepping, and smooth 36-pixel shimmer
   const triggerWalkStep = useCallback(() => {
     if (!isAutoWalkRef.current) return;
 
-    stepStartTimeRef.current = Date.now();
-    const current = activePixelRef.current !== null ? activePixelRef.current : -1;
     const mode = autoWalkModeRef.current;
-    let nextPixel = 0;
+    const baseSpeed = Math.max(1, autoWalkSpeedRef.current || 60);
 
+    // MODE: SHIMMER (Плавное независимое мерцание/блестение каждого пикселя отдельно, 120Hz refresh)
+    if (mode === 'shimmer') {
+      const spdFactor = Math.max(0.4, (205 - baseSpeed) / 45);
+      shimmerTimeRef.current += 0.015 * spdFactor;
+      const t = shimmerTimeRef.current;
+      const levels = [];
+      for (let i = 0; i < 36; i++) {
+        // Multi-harmonic natural twinkle with distinct phase per LED
+        const phase = (i * 0.44) + (i % 7) * 0.95;
+        const w1 = Math.sin(t * 3.0 + phase);
+        const w2 = Math.cos(t * 1.5 + phase * 0.6);
+        const raw = (w1 * 0.6 + w2 * 0.4 + 1) / 2;
+        const sparkle = Math.pow(raw, 2.2); // Crisp diamond glisten curve
+        levels.push(Math.max(0.08, Math.min(1, sparkle)));
+      }
+      setPixelLevels(levels);
+      setActivePixel(null);
+      // Native 120Hz tick interval (8.33ms)
+      stepTimerRef.current = setTimeout(triggerWalkStep, 8);
+      return;
+    }
+
+    // MODE: COMET (Метеор со светящимся неоновым хвостом из 5 микро-LED, 120Hz refresh)
+    if (mode === 'comet') {
+      const now = Date.now();
+      const elapsed = stepStartTimeRef.current > 0 ? now - stepStartTimeRef.current : 0;
+      stepStartTimeRef.current = now;
+
+      const current = activePixelRef.current !== null ? activePixelRef.current : -1;
+      const deltaStep = baseSpeed < 8
+        ? Math.max(1, Math.round((elapsed > 0 ? elapsed : 8.33) / baseSpeed))
+        : 1;
+
+      const nextPixel = current < 0 ? 0 : (current + deltaStep) % 36;
+      activePixelRef.current = nextPixel;
+      setActivePixel(null);
+
+      const levels = new Array(36).fill(0);
+      levels[nextPixel] = 1.0;
+      levels[(nextPixel - 1 + 36) % 36] = 0.70;
+      levels[(nextPixel - 2 + 36) % 36] = 0.42;
+      levels[(nextPixel - 3 + 36) % 36] = 0.20;
+      levels[(nextPixel - 4 + 36) % 36] = 0.07;
+      setPixelLevels(levels);
+      setBrightness([0, 0, 0]);
+
+      const nextDelay = baseSpeed < 8
+        ? 8
+        : calculateNormalizedStepDelay(nextPixel, baseSpeed);
+
+      stepTimerRef.current = setTimeout(triggerWalkStep, nextDelay);
+      return;
+    }
+
+    setPixelLevels(null);
+
+    const now = Date.now();
+    const elapsed = stepStartTimeRef.current > 0 ? now - stepStartTimeRef.current : 0;
+    stepStartTimeRef.current = now;
+
+    const current = activePixelRef.current !== null ? activePixelRef.current : -1;
+
+    // For turbo speeds (< 8ms), advance multiple steps per 120Hz frame (8.33ms)
+    const deltaStep = baseSpeed < 8
+      ? Math.max(1, Math.round((elapsed > 0 ? elapsed : 8.33) / baseSpeed))
+      : 1;
+
+    let nextPixel = 0;
     if (mode === 'forward') {
-      nextPixel = (current + 1) % 36;
+      nextPixel = current < 0 ? 0 : (current + deltaStep) % 36;
     } else if (mode === 'reverse') {
-      nextPixel = current <= 0 ? 35 : current - 1;
+      const startPos = current < 0 ? 36 : current;
+      nextPixel = ((startPos - deltaStep) % 36 + 36) % 36;
     } else if (mode === 'pingpong') {
-      if (current >= 35) walkDirectionRef.current = -1;
-      else if (current <= 0) walkDirectionRef.current = 1;
-      nextPixel = Math.max(0, Math.min(35, current + walkDirectionRef.current));
+      let tempPixel = current < 0 ? 0 : current;
+      let tempDir = walkDirectionRef.current;
+      for (let s = 0; s < deltaStep; s++) {
+        if (tempPixel >= 35) tempDir = -1;
+        else if (tempPixel <= 0) tempDir = 1;
+        tempPixel = Math.max(0, Math.min(35, tempPixel + tempDir));
+      }
+      walkDirectionRef.current = tempDir;
+      nextPixel = tempPixel;
     } else if (mode === 'random') {
       nextPixel = Math.floor(Math.random() * 36);
     }
@@ -198,8 +283,12 @@ export default function App() {
     nextB[arc] = b;
     setBrightness(nextB);
 
-    const speed = Math.max(5, autoWalkSpeedRef.current || 60);
-    stepTimerRef.current = setTimeout(triggerWalkStep, speed);
+    // Schedule next tick with 120Hz minimum ceiling (8ms)
+    const nextDelay = baseSpeed < 8
+      ? 8
+      : calculateNormalizedStepDelay(nextPixel, baseSpeed);
+
+    stepTimerRef.current = setTimeout(triggerWalkStep, nextDelay);
   }, []);
 
   // Auto-walk toggle
@@ -210,21 +299,14 @@ export default function App() {
 
   // Instant auto-walk speed adjustment with dynamic timer rescheduling
   const handleAutoWalkSpeedChange = useCallback((newSpeed) => {
-    setAutoWalkSpeed(newSpeed);
-    autoWalkSpeedRef.current = newSpeed;
+    const clampedSpeed = isNaN(newSpeed) ? 60 : Math.max(1, Math.min(200, Math.round(newSpeed)));
+    setAutoWalkSpeed(clampedSpeed);
+    autoWalkSpeedRef.current = clampedSpeed;
 
     // Real-time recalculation of active step timer
     if (isAutoWalkRef.current && stepTimerRef.current) {
-      const elapsed = Date.now() - stepStartTimeRef.current;
-      const remaining = newSpeed - elapsed;
       clearTimeout(stepTimerRef.current);
-      if (remaining <= 0) {
-        // Interval already elapsed -> step immediately
-        triggerWalkStep();
-      } else {
-        // Reschedule pending step for remaining adjusted interval
-        stepTimerRef.current = setTimeout(triggerWalkStep, remaining);
-      }
+      triggerWalkStep();
     }
   }, [triggerWalkStep]);
 
@@ -248,8 +330,9 @@ export default function App() {
     };
   }, [isAutoWalk, triggerWalkStep]);
 
-  // Tab switch with smooth directional slide and opacity transition
+  // Tab switch with smooth directional slide, scale pop, and opacity transition
   const handleTabSwitch = useCallback((tabIndex) => {
+    setIsCategorySwitcherOpen(false);
     const cur = currentTabRef.current;
     if (tabIndex === cur) return;
     Haptics.selectionAsync().catch(() => {});
@@ -264,13 +347,29 @@ export default function App() {
       }
       setActivePixel(null);
       activePixelRef.current = null;
+      setPixelLevels(null);
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      setBrightness([b, b, b]);
+    }
+
+    if (cur === 4 && tabIndex !== 4) {
+      setActivePixel(null);
+      activePixelRef.current = null;
+      setPixelLevels(null);
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      setBrightness([b, b, b]);
+    }
+
+    // When returning to Control tab, restore normal arc brightness according to master
+    if (tabIndex === 0 && cur !== 0) {
       const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
       setBrightness([b, b, b]);
     }
 
     const direction = tabIndex > cur ? 1 : -1;
-    screenTranslateX.setValue(direction * 35);
-    screenFadeAnim.setValue(0.5);
+    screenTranslateX.setValue(direction * 36);
+    screenFadeAnim.setValue(0.35);
+    screenScaleAnim.setValue(0.96);
 
     setCurrentTab(tabIndex);
     currentTabRef.current = tabIndex;
@@ -278,17 +377,23 @@ export default function App() {
     Animated.parallel([
       Animated.spring(screenTranslateX, {
         toValue: 0,
-        tension: 130,
-        friction: 13,
+        tension: 140,
+        friction: 14,
+        useNativeDriver: true,
+      }),
+      Animated.spring(screenScaleAnim, {
+        toValue: 1,
+        tension: 150,
+        friction: 15,
         useNativeDriver: true,
       }),
       Animated.timing(screenFadeAnim, {
         toValue: 1,
-        duration: 160,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [screenFadeAnim, screenTranslateX]);
+  }, [screenFadeAnim, screenScaleAnim, screenTranslateX]);
 
   // Horizontal swipe between tabs (dynamic currentTabRef lookup avoids stale closure)
   const panResponder = useRef(
@@ -316,7 +421,23 @@ export default function App() {
     })
   ).current;
 
-  if (!fontsLoaded) {
+  // Effective brightness delivered to GlyphCameraSilhouette (Master Dimmer non-destructive scaling)
+  // IMPORTANT: useMemo MUST be called before any early return to satisfy React's Rules of Hooks
+  const effectiveBrightness = useMemo(() => {
+    const scale = masterBrightness / 255;
+    return brightness.map((b) => Math.round(b * scale));
+  }, [brightness, masterBrightness]);
+
+  // Live status previews for Category Switcher
+  const categoryStats = useMemo(() => ({
+    0: masterBrightness > 0 ? `${Math.round((masterBrightness / 255) * 100)}% ЯРКОСТЬ` : 'ВЫКЛ',
+    1: isAutoWalk ? `АВТО ${autoWalkSpeed}МС` : 'ГОТОВ',
+    2: '8 ШАГОВ',
+    3: 'FFT СПЕКТР',
+    4: 'ИНСТРУМЕНТЫ',
+  }), [masterBrightness, isAutoWalk, autoWalkSpeed]);
+
+  if (!fontsLoaded && !fontError) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -326,40 +447,43 @@ export default function App() {
 
   const isAnyOn = brightness.some((b) => b > 10);
 
-  // Live status previews for Category Switcher
-  const categoryStats = {
-    0: masterBrightness > 0 ? `${Math.round((masterBrightness / 255) * 100)}% ЯРКОСТЬ` : 'ВЫКЛ',
-    1: isAutoWalk ? `АВТО ${autoWalkSpeed}МС` : 'ГОТОВ',
-    2: '16 ШАГОВ',
-    3: 'FFT СПЕКТР',
-    4: 'ИНСТРУМЕНТЫ',
-  };
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <ExpoStatusBar style="light" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <View style={styles.pulseDot} />
-          <Text style={styles.headerTitle}>GLYPH (STUDIO)</Text>
+        {/* Ambient background depth for authentic Liquid Glass refraction */}
+        <LinearGradient
+          colors={['#080a14', '#020306', '#050710']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTitleRow}>
+            <View style={styles.pulseDot} />
+            <Text style={styles.headerTitle}>GLYPH (STUDIO)</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerBadge}
+            onPress={() => setIsCategorySwitcherOpen(true)}
+            activeOpacity={0.7}
+          >
+            {/* Top specular highlight edge for glass badge */}
+            <View style={styles.badgeTopRim} pointerEvents="none" />
+            <Text style={styles.deviceTag}>РАЗДЕЛЫ ▾</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.headerBadge}
-          onPress={() => setIsCategorySwitcherOpen(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.deviceTag}>РАЗДЕЛЫ ▾</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Prominent Glowing Camera Module with Glyph Arcs */}
       <View style={styles.simulatorContainer}>
         <GlyphCameraSilhouette
-          brightness={brightness}
+          brightness={effectiveBrightness}
           activePixel={activePixel}
+          pixelLevels={pixelLevels}
           onArcPress={handleArcPress}
           size={265}
         />
@@ -371,7 +495,10 @@ export default function App() {
           styles.screenContainer,
           {
             opacity: screenFadeAnim,
-            transform: [{ translateX: screenTranslateX }],
+            transform: [
+              { translateX: screenTranslateX },
+              { scale: screenScaleAnim },
+            ],
           },
         ]}
         {...panResponder.panHandlers}
@@ -414,6 +541,7 @@ export default function App() {
             brightness={brightness}
             onBrightnessChange={setBrightness}
             onActivePixelChange={handleActivePixelChange}
+            onPixelLevelsChange={handlePixelLevelsChange}
           />
         )}
       </Animated.View>
@@ -423,7 +551,6 @@ export default function App() {
         tabs={TABS}
         currentTab={currentTab}
         onSelectTab={handleTabSwitch}
-        onOpenCategorySwitcher={() => setIsCategorySwitcherOpen(true)}
       />
 
       {/* iOS Liquid Glass Category Switcher Sheet Modal */}
@@ -459,7 +586,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(14, 16, 26, 0.45)',
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -471,6 +599,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: GlyphColors.neonRed,
     marginRight: 8,
+    shadowColor: GlyphColors.neonRed,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
   },
   headerTitle: {
     fontFamily: 'NDOT57',
@@ -481,10 +613,21 @@ const styles = StyleSheet.create({
   headerBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderTopColor: 'rgba(255, 255, 255, 0.40)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  badgeTopRim: {
+    position: 'absolute',
+    top: 0,
+    left: 4,
+    right: 4,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
   deviceTag: {
     fontFamily: 'NDOT57',
@@ -495,8 +638,8 @@ const styles = StyleSheet.create({
   simulatorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 4,
-    paddingBottom: 2,
+    paddingTop: 2,
+    paddingBottom: 0,
   },
   screenContainer: {
     flex: 1,

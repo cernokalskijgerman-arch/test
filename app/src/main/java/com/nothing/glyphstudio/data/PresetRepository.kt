@@ -17,11 +17,11 @@ object PresetRepository {
             name = "Cyber Metro",
             author = "Nothing Studio",
             bpm = 128,
-            stepCount = 16,
+            stepCount = 8,
             tracks = listOf(
-                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 180, 0)),
-                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 0, 200, 0, 0, 0, 200, 0, 0, 0, 200, 0, 0, 150, 255, 0)),
-                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 255, 0))
+                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 0, 0, 0, 255, 0, 0, 0)),
+                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 0, 200, 0, 0, 0, 200, 0)),
+                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 0, 0, 0, 0, 0, 0, 0))
             )
         ),
         // 2. Neon Heartbeat
@@ -30,11 +30,11 @@ object PresetRepository {
             name = "Neon Heartbeat",
             author = "Nothing Studio",
             bpm = 75,
-            stepCount = 16,
+            stepCount = 8,
             tracks = listOf(
-                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 120, 255, 40, 0, 0, 0, 0, 255, 120, 255, 40, 0, 0, 0, 0)),
-                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 200, 80, 0, 0, 0, 0, 0, 0, 200, 80, 0, 0, 0, 0, 0)),
-                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 180, 0, 0, 0, 0, 0, 0, 255, 180, 0, 0, 0, 0, 0, 0))
+                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 120, 255, 40, 0, 0, 0, 0)),
+                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 200, 80, 0, 0, 0, 0, 0)),
+                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 180, 0, 0, 0, 0, 0, 0))
             )
         ),
         // 3. Strobe Sweep
@@ -43,11 +43,11 @@ object PresetRepository {
             name = "Strobe Sweep",
             author = "Nothing Studio",
             bpm = 140,
-            stepCount = 16,
+            stepCount = 8,
             tracks = listOf(
-                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 255, 0, 255, 255, 0, 255, 0, 255, 255, 0, 255, 255, 0, 255, 255)),
-                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255)),
-                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0))
+                StepTrack(0, "Top-Left Arc (20 LEDs)", mutableListOf(255, 255, 0, 255, 255, 0, 255, 0)),
+                StepTrack(1, "Bottom-Left Arc (5 LEDs)", mutableListOf(0, 255, 0, 255, 0, 255, 0, 255)),
+                StepTrack(2, "Right Arc (11 LEDs)", mutableListOf(255, 0, 255, 0, 255, 0, 255, 0))
             )
         )
     )

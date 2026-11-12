@@ -22,6 +22,7 @@ export default function GlyphSlider({
   style,
   accentColor = GlyphColors.neonRed,
   disabled = false,
+  compact = false,
 }) {
   const trackWidthRef = useRef(200);
   const startXRef = useRef(0);
@@ -125,25 +126,27 @@ export default function GlyphSlider({
   const percentageStr = `${(fraction * 100).toFixed(1)}%`;
 
   return (
-    <View style={[styles.container, disabled && styles.containerDisabled, style]}>
+    <View style={[styles.container, compact && styles.containerCompact, disabled && styles.containerDisabled, style]}>
       {/* Label and Value Row */}
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={[styles.valueText, fraction > 0 && { color: '#FFFFFF' }]}>
-          {displayValue !== undefined ? displayValue : `${Math.round(value)}${unit}`}
-        </Text>
-      </View>
+      {Boolean(label && `${label}`.trim().length > 0) && (
+        <View style={[styles.labelRow, compact && styles.labelRowCompact]}>
+          <Text style={styles.label}>{label}</Text>
+          <Text style={[styles.valueText, fraction > 0 && { color: '#FFFFFF' }]}>
+            {displayValue !== undefined ? displayValue : `${Math.round(value)}${unit}`}
+          </Text>
+        </View>
+      )}
 
       {/* Touch Interaction Container */}
       <View
-        style={styles.touchArea}
+        style={[styles.touchArea, compact && styles.touchAreaCompact]}
         {...panResponder.panHandlers}
         onLayout={(e) => {
           trackWidthRef.current = e.nativeEvent.layout.width;
         }}
       >
         {/* Liquid Glass Track Trough */}
-        <View pointerEvents="none" style={styles.trackBackground}>
+        <View pointerEvents="none" style={[styles.trackBackground, compact && styles.trackBackgroundCompact]}>
           {/* Top specular reflection strip inside track */}
           <View style={styles.trackTopRim} />
 
@@ -154,6 +157,7 @@ export default function GlyphSlider({
             end={{ x: 1, y: 0 }}
             style={[
               styles.trackActive,
+              compact && styles.trackActiveCompact,
               {
                 width: percentageStr,
                 opacity: fraction > 0.005 ? 1 : 0,
@@ -167,6 +171,7 @@ export default function GlyphSlider({
           pointerEvents="none"
           style={[
             styles.thumb,
+            compact && styles.thumbCompact,
             {
               left: percentageStr,
               borderColor: fraction > 0.005 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)',
@@ -178,6 +183,7 @@ export default function GlyphSlider({
           <View
             style={[
               styles.thumbCore,
+              compact && styles.thumbCoreCompact,
               {
                 backgroundColor: fraction > 0.005 ? accentColor : '#444455',
               },
@@ -194,6 +200,9 @@ const styles = StyleSheet.create({
     marginVertical: 3,
     width: '100%',
   },
+  containerCompact: {
+    marginVertical: 1,
+  },
   containerDisabled: {
     opacity: 0.45,
   },
@@ -202,6 +211,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 4,
+  },
+  labelRowCompact: {
+    marginBottom: 2,
   },
   label: {
     fontFamily: 'NDOT57',
@@ -221,6 +233,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
+  touchAreaCompact: {
+    height: 24,
+  },
   trackBackground: {
     height: 7,
     borderRadius: 3.5,
@@ -229,6 +244,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.16)',
     overflow: 'hidden',
     position: 'relative',
+  },
+  trackBackgroundCompact: {
+    height: 5,
+    borderRadius: 2.5,
   },
   trackTopRim: {
     position: 'absolute',
@@ -241,6 +260,9 @@ const styles = StyleSheet.create({
   trackActive: {
     height: '100%',
     borderRadius: 3.5,
+  },
+  trackActiveCompact: {
+    borderRadius: 2.5,
   },
   thumb: {
     position: 'absolute',
@@ -264,9 +286,21 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  thumbCompact: {
+    top: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
+  },
   thumbCore: {
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  thumbCoreCompact: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

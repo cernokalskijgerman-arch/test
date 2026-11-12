@@ -13,12 +13,24 @@ import { GlyphColors } from '../theme/colors';
 
 /**
  * Screen 4: «МУЗЫКА»
- * FFT Reactive Audio Visualizer with 3 frequency meters and sensitivity slider.
+ * Advanced Music Visualizer with 6 reactive modes,
+ * real-time frequency meters, and sensitivity control.
  */
+
+const MODES = [
+  { id: 'spectrum',   label: 'СПЕКТР' },
+  { id: 'wave',       label: 'ВОЛНА' },
+  { id: 'pulse',      label: 'ПУЛЬС' },
+  { id: 'bassboom',   label: 'БАС-БУМ' },
+  { id: 'chase',      label: 'ПОГОНЯ' },
+  { id: 'strobe',     label: 'СТРОБ' },
+];
+
 export default function VisualizerScreen({ brightness, onBrightnessChange }) {
   const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState('spectrum'); // 'spectrum' | 'wave' | 'pulse'
+  const [mode, setMode] = useState('spectrum');
   const [sensitivity, setSensitivity] = useState(85);
+  const [speed, setSpeed] = useState(50);
   const [bass, setBass] = useState(0);
   const [mid, setMid] = useState(0);
   const [treble, setTreble] = useState(0);
@@ -27,6 +39,9 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
   const tickRef = useRef(0);
   const sensitivityRef = useRef(sensitivity);
   sensitivityRef.current = sensitivity;
+
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
 
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -46,11 +61,15 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
       return;
     }
 
+    // 120Hz dynamic refresh: 8ms minimum interval for fluid high-framerate spectrum
+    const intervalMs = Math.max(8, Math.round(50 - (speedRef.current / 100) * 42));
+
     timerRef.current = setInterval(() => {
       const sens = sensitivityRef.current / 100;
       const curMode = modeRef.current;
+      const spd = speedRef.current / 50; // speed multiplier
 
-      tickRef.current += 0.22;
+      tickRef.current += 0.055 * spd * (intervalMs / 8);
       const t = tickRef.current;
 
       let curBass = 0;
@@ -58,18 +77,39 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
       let curTreble = 0;
 
       if (curMode === 'spectrum') {
+        // Classic FFT spectrum: each arc reacts to a different frequency band
         curBass = Math.max(0, Math.sin(t * 1.1) * 0.9 * sens + (Math.sin(t * 0.4) > 0.5 ? 0.3 : 0));
         curMid = Math.max(0, Math.cos(t * 1.8) * 0.8 * sens);
         curTreble = Math.max(0, Math.sin(t * 3.2) * 0.85 * sens);
       } else if (curMode === 'wave') {
+        // Smooth sine wave flowing through arcs with phase offset
         curBass = Math.max(0, (Math.sin(t) * 0.5 + 0.5) * sens);
         curMid = Math.max(0, (Math.sin(t + 1.2) * 0.5 + 0.5) * sens);
         curTreble = Math.max(0, (Math.sin(t + 2.4) * 0.5 + 0.5) * sens);
       } else if (curMode === 'pulse') {
+        // Sharp beat-synced pulse: all arcs flash on beat
         const beat = Math.sin(t * 2) > 0.6 ? 1 : 0.05;
         curBass = beat * sens;
         curMid = Math.max(0, (beat * 0.7 + Math.sin(t * 4) * 0.25) * sens);
         curTreble = Math.max(0, (beat * 0.5 + Math.cos(t * 6) * 0.3) * sens);
+      } else if (curMode === 'bassboom') {
+        // Heavy bass emphasis: right arc (bass) dominates, others react subtly
+        const bassHit = Math.pow(Math.max(0, Math.sin(t * 1.4)), 3);
+        curBass = Math.min(1, bassHit * 1.5 * sens);
+        curMid = Math.max(0, bassHit * 0.25 * sens + Math.sin(t * 5) * 0.08 * sens);
+        curTreble = Math.max(0, bassHit * 0.15 * sens + Math.cos(t * 7) * 0.06 * sens);
+      } else if (curMode === 'chase') {
+        // Light chases around arcs sequentially
+        const phase = (t * 1.5) % 3;
+        curBass = phase < 1 ? Math.max(0, (1 - phase) * sens) : 0;
+        curMid = phase >= 0.8 && phase < 1.8 ? Math.max(0, (1 - Math.abs(phase - 1.3) / 0.5) * sens) : 0;
+        curTreble = phase >= 1.6 && phase < 2.6 ? Math.max(0, (1 - Math.abs(phase - 2.1) / 0.5) * sens) : 0;
+      } else if (curMode === 'strobe') {
+        // Random rapid strobe flicker on all arcs independently
+        const strobeThresh = 0.55 - sens * 0.3;
+        curBass = Math.random() > strobeThresh ? sens : 0;
+        curMid = Math.random() > strobeThresh ? sens : 0;
+        curTreble = Math.random() > strobeThresh ? sens : 0;
       }
 
       curBass = Math.min(1, Math.max(0, curBass));
@@ -87,7 +127,7 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
       if (onBrightnessChange) {
         onBrightnessChange([bTL, bBL, bR]);
       }
-    }, 40);
+    }, intervalMs);
 
     return () => {
       if (timerRef.current) {
@@ -98,13 +138,7 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
         onBrightnessChange([0, 0, 0]);
       }
     };
-  }, [isActive]);
-
-  const modes = [
-    { id: 'spectrum', label: 'СПЕКТР' },
-    { id: 'wave', label: 'ВОЛНА' },
-    { id: 'pulse', label: 'БАС-ПУЛЬС' },
-  ];
+  }, [isActive, speed]);
 
   return (
     <ScrollView
@@ -113,11 +147,11 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
       showsVerticalScrollIndicator={false}
     >
       {/* ============================================================ */}
-      {/* 1. VISUALIZER MASTER CARD                                    */}
+      {/* VISUALIZER MASTER CARD                                       */}
       {/* ============================================================ */}
       <LiquidGlassCard isActive={isActive}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>FFT ВИЗУАЛИЗАТОР МУЗЫКИ</Text>
+          <Text style={styles.title}>ВИЗУАЛИЗАТОР МУЗЫКИ</Text>
           <TouchableOpacity
             style={[styles.toggleBtn, isActive && styles.toggleBtnActive]}
             onPress={() => {
@@ -132,31 +166,48 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
           </TouchableOpacity>
         </View>
 
-        {/* Mode Selector */}
-        <View style={styles.modesRow}>
-          {modes.map((m) => {
-            const isSelected = mode === m.id;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[styles.modeBtn, isSelected && styles.modeBtnActive]}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setMode(m.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.modeBtnText,
-                    isSelected && styles.modeBtnTextActive,
-                  ]}
+        {/* Mode Selector - 2 rows of 3 */}
+        <View style={styles.modesContainer}>
+          <View style={styles.modesRow}>
+            {MODES.slice(0, 3).map((m) => {
+              const isSelected = mode === m.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.modeBtn, isSelected && styles.modeBtnActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setMode(m.id);
+                  }}
+                  activeOpacity={0.7}
                 >
-                  {m.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={styles.modesRow}>
+            {MODES.slice(3, 6).map((m) => {
+              const isSelected = mode === m.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.modeBtn, isSelected && styles.modeBtnActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setMode(m.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <View style={styles.divider} />
@@ -174,7 +225,6 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
               />
             </View>
             <Text style={styles.meterLabel}>ВЕРХ-ЛЕВО</Text>
-            <Text style={styles.meterFreq}>СЧ (MID)</Text>
           </View>
 
           {/* Treble -> Bottom-Left Arc */}
@@ -188,7 +238,6 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
               />
             </View>
             <Text style={styles.meterLabel}>НИЗ-ЛЕВО</Text>
-            <Text style={styles.meterFreq}>ВЧ (TREBLE)</Text>
           </View>
 
           {/* Bass -> Right Arc */}
@@ -202,7 +251,6 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
               />
             </View>
             <Text style={styles.meterLabel}>ПРАВАЯ</Text>
-            <Text style={styles.meterFreq}>НЧ (BASS)</Text>
           </View>
         </View>
 
@@ -210,15 +258,30 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
 
         {/* Sensitivity Slider */}
         <GlyphSlider
-          label="ЧУВСТВИТЕЛЬНОСТЬ РЕАКЦИИ"
+          label="ЧУВСТВИТЕЛЬНОСТЬ"
           value={sensitivity}
           min={10}
           max={100}
           step={1}
-          unit="%"
           displayValue={`${sensitivity}%`}
           accentColor="#FFFFFF"
           onValueChange={(val) => setSensitivity(val)}
+        />
+
+        {/* Speed Slider */}
+        <GlyphSlider
+          label="СКОРОСТЬ"
+          value={speed}
+          min={1}
+          max={100}
+          step={1}
+          displayValue={
+            speed <= 20 ? `${speed}% МЕДЛЕННО`
+            : speed <= 70 ? `${speed}%`
+            : `${speed}% БЫСТРО`
+          }
+          accentColor={GlyphColors.neonCyan}
+          onValueChange={(val) => setSpeed(val)}
         />
       </LiquidGlassCard>
     </ScrollView>
@@ -247,16 +310,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1.2,
   },
-  subtitle: {
-    fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#8E8E98',
-    marginTop: 1,
-  },
   toggleBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderTopColor: 'rgba(255, 255, 255, 0.38)',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -264,6 +322,10 @@ const styles = StyleSheet.create({
   toggleBtnActive: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   toggleBtnText: {
     fontFamily: 'NDOT57',
@@ -275,23 +337,31 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: 'bold',
   },
-  modesRow: {
-    flexDirection: 'row',
+  modesContainer: {
     gap: 5,
     marginBottom: 4,
   },
+  modesRow: {
+    flexDirection: 'row',
+    gap: 5,
+  },
   modeBtn: {
     flex: 1,
-    paddingVertical: 5,
+    paddingVertical: 5.5,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
   },
   modeBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.60)',
+    borderTopColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.20,
+    shadowRadius: 5,
   },
   modeBtnText: {
     fontFamily: 'NDOT57',
@@ -323,7 +393,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderTopColor: 'rgba(255, 255, 255, 0.35)',
     justifyContent: 'flex-end',
     overflow: 'hidden',
     padding: 2,
@@ -342,11 +413,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.8,
     marginTop: 6,
-  },
-  meterFreq: {
-    fontFamily: 'NDOT57',
-    fontSize: 7,
-    color: '#707080',
-    marginTop: 1,
   },
 });
