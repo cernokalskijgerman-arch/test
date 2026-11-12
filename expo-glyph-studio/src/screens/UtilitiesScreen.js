@@ -13,10 +13,14 @@ import { GlyphColors } from '../theme/colors';
 
 /**
  * Screen 5: «УТИЛИТЫ»
- * Softlight torch with brightness, Strobe with Hz regulation,
- * Visual Countdown Timer, Battery HUD, and Arcade Mini-Games.
+ * Minimalist tools: Softlight flashlight, Strobe beacon, Visual Countdown Timer,
+ * Battery HUD, Single-Pixel Spin the Bottle, and Reflex Reaction Test.
  */
-export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
+export default function UtilitiesScreen({
+  brightness,
+  onBrightnessChange,
+  onActivePixelChange,
+}) {
   const [activeMode, setActiveMode] = useState(null); // 'softlight' | 'strobe' | 'timer' | 'battery' | 'roulette' | 'reflex'
 
   // Softlight State
@@ -33,9 +37,9 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
   // Battery State
   const [batteryLevel, setBatteryLevel] = useState(82);
 
-  // Roulette State
+  // Bottle Spin (Roulette) State: Single Moving Pixel
   const [isSpinning, setIsSpinning] = useState(false);
-  const [winnerArc, setWinnerArc] = useState(null);
+  const [winnerPixel, setWinnerPixel] = useState(null);
 
   // Reflex State
   const [reflexState, setReflexState] = useState('IDLE'); // 'IDLE' | 'WAITING' | 'FLASH' | 'RESULT' | 'EARLY'
@@ -48,6 +52,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
   const spinTimerRef = useRef(null);
   const reflexTimerRef = useRef(null);
   const reflexStartTimeRef = useRef(0);
+  const spinStepRef = useRef(0);
 
   const stopAll = () => {
     setActiveMode(null);
@@ -58,6 +63,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
     if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
     if (reflexTimerRef.current) clearTimeout(reflexTimerRef.current);
     if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+    if (onActivePixelChange) onActivePixelChange(null);
   };
 
   // 1. Softlight Handlers
@@ -109,7 +115,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
     }
   };
 
-  // 3. Timer Handlers
+  // 3. Visual Timer Handlers
   const handleStartTimer = (secs) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     stopAll();
@@ -157,7 +163,6 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
   };
 
   const applyBatteryGlyphs = (level) => {
-    // 0..33% -> TL, 34..66% -> TL+BL, 67..100% -> ALL
     const tl = level > 5 ? Math.round(Math.min(1, level / 33) * 255) : 0;
     const bl = level > 33 ? Math.round(Math.min(1, (level - 33) / 33) * 255) : 0;
     const r = level > 66 ? Math.round(Math.min(1, (level - 66) / 34) * 255) : 0;
@@ -171,57 +176,71 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
     }
   };
 
-  // 5. Roulette Spin
-  const handleStartRoulette = () => {
+  // 5. Spin the Bottle (Световая бутылочка): Single Moving Pixel with Randomized Timing
+  const handleStartBottleSpin = () => {
     if (isSpinning) return;
     stopAll();
     setActiveMode('roulette');
     setIsSpinning(true);
-    setWinnerArc(null);
+    setWinnerPixel(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
-    const arcOrder = [0, 2, 1]; // Top-Left -> Right -> Bottom-Left
-    let step = 0;
-    const totalSteps = 26 + Math.floor(Math.random() * 12);
-    let delayMs = 35;
+    // Randomize time and total step parameters on EVERY new spin
+    // Total steps = random revolutions (3..5 full circles) + random landing offset (0..35)
+    const fullRevolutions = 3 + Math.floor(Math.random() * 3);
+    const landingPixel = Math.floor(Math.random() * 36);
+    const startPixel = Math.floor(Math.random() * 36);
+    const totalSteps = fullRevolutions * 36 + ((landingPixel - startPixel + 36) % 36);
 
-    const doStep = () => {
-      const currentArc = arcOrder[step % 3];
-      const nextBrightness = [0, 0, 0];
-      nextBrightness[currentArc] = 255;
-      if (onBrightnessChange) onBrightnessChange(nextBrightness);
+    let currentPixel = startPixel;
+    let step = 0;
+    spinStepRef.current = 0;
+
+    const runStep = () => {
+      // Step to next pixel circularly around 36 micro-LEDs
+      currentPixel = (currentPixel + 1) % 36;
+      if (onActivePixelChange) {
+        onActivePixelChange(currentPixel);
+      }
 
       step++;
+      spinStepRef.current = step;
+
       if (step < totalSteps) {
         const progress = step / totalSteps;
+        // Non-linear natural deceleration curve (starts at fast 16ms, smoothly decelerates up to ~220ms)
+        let delayMs = 16;
         if (progress > 0.45) {
-          delayMs = 35 + Math.floor(progress * progress * 350);
+          const decelFactor = (progress - 0.45) / 0.55;
+          delayMs = 16 + Math.floor(Math.pow(decelFactor, 2.4) * 210);
         }
-        spinTimerRef.current = setTimeout(doStep, delayMs);
+
+        spinTimerRef.current = setTimeout(runStep, delayMs);
       } else {
-        const finalArc = arcOrder[(step - 1) % 3];
-        setWinnerArc(finalArc);
+        // Stopped smoothly on the final randomly chosen pixel!
+        const finalPixel = currentPixel;
+        setWinnerPixel(finalPixel);
         setIsSpinning(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-        let fl = 0;
-        const vi = setInterval(() => {
-          fl++;
-          const fb = fl % 2 === 1 ? 255 : 0;
-          const flashArray = [0, 0, 0];
-          flashArray[finalArc] = fb;
-          if (onBrightnessChange) onBrightnessChange(flashArray);
-          if (fl >= 6) {
-            clearInterval(vi);
-            const finalState = [0, 0, 0];
-            finalState[finalArc] = 255;
-            if (onBrightnessChange) onBrightnessChange(finalState);
+        // Victory confirmation pulse on the winning pixel
+        let flash = 0;
+        const victoryTimer = setInterval(() => {
+          flash++;
+          if (flash % 2 === 1) {
+            onActivePixelChange && onActivePixelChange(null);
+          } else {
+            onActivePixelChange && onActivePixelChange(finalPixel);
           }
-        }, 130);
+          if (flash >= 6) {
+            clearInterval(victoryTimer);
+            onActivePixelChange && onActivePixelChange(finalPixel);
+          }
+        }, 120);
       }
     };
 
-    doStep();
+    runStep();
   };
 
   // 6. Reflex Test
@@ -263,8 +282,16 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
       if (reflexTimerRef.current) clearTimeout(reflexTimerRef.current);
       if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+      if (onActivePixelChange) onActivePixelChange(null);
     };
   }, []);
+
+  const getWinnerPixelZone = (p) => {
+    if (p === null) return '';
+    if (p >= 0 && p <= 19) return 'ВЕРХ-ЛЕВО';
+    if (p >= 20 && p <= 30) return 'ПРАВЫЙ';
+    return 'НИЗ-ЛЕВО';
+  };
 
   return (
     <ScrollView
@@ -277,12 +304,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <LiquidGlassCard isActive={activeMode === 'softlight'}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>ФОНАРИК (SOFTLIGHT)</Text>
-            <Text style={styles.cardSubtitle}>
-              Равномерное рассеянное свечение для фото и видео
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>ФОНАРИК (SOFTLIGHT)</Text>
           <TouchableOpacity
             style={[styles.btn, activeMode === 'softlight' && styles.btnActive]}
             onPress={handleToggleSoftlight}
@@ -311,12 +333,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <LiquidGlassCard isActive={activeMode === 'strobe'}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>СТРОБОСКОП</Text>
-            <Text style={styles.cardSubtitle}>
-              Импульсный стробоскоп с регулируемой частотой
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>СТРОБОСКОП</Text>
           <TouchableOpacity
             style={[styles.btn, activeMode === 'strobe' && styles.btnActive]}
             onPress={handleToggleStrobe}
@@ -361,14 +378,9 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <LiquidGlassCard isActive={activeMode === 'timer'}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>
-              {isTimerRunning ? `ТАЙМЕР: ${timerRemaining} С` : 'ТАЙМЕР'}
-            </Text>
-            <Text style={styles.cardSubtitle}>
-              Плавное угасание глифа по истечении времени
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>
+            {isTimerRunning ? `ТАЙМЕР: ${timerRemaining} С` : 'ТАЙМЕР'}
+          </Text>
           <TouchableOpacity
             style={[styles.btn, isTimerRunning && styles.btnActive]}
             onPress={() => (isTimerRunning ? stopAll() : handleStartTimer(timerDuration))}
@@ -412,12 +424,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <LiquidGlassCard isActive={activeMode === 'battery'}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>ИНДИКАТОР ЗАРЯДА</Text>
-            <Text style={styles.cardSubtitle}>
-              Отображение уровня батареи секторами глифа
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>ИНДИКАТОР ЗАРЯДА</Text>
           <TouchableOpacity
             style={[styles.btn, activeMode === 'battery' && styles.btnActive]}
             onPress={handleToggleBattery}
@@ -447,20 +454,16 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <View style={styles.arcadeHeaderRow}>
         <Text style={styles.arcadeSectionTitle}>АРКАДНЫЕ ИГРЫ GLYPH</Text>
-        <Text style={styles.arcadeSectionMeta}>Интерактивные мини-игры</Text>
       </View>
 
-      {/* GAME 1: ROULETTE */}
+      {/* GAME 1: SPIN THE BOTTLE (СВЕТОВАЯ БУТЫЛОЧКА) */}
       <LiquidGlassCard isActive={activeMode === 'roulette'}>
         <View style={styles.rouletteBox}>
           <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.cardTitle}>СВЕТОВАЯ БУТЫЛОЧКА</Text>
-              <Text style={styles.cardSubtitle}>Вращение луча света по 3 дугам</Text>
-            </View>
+            <Text style={styles.cardTitle}>СВЕТОВАЯ БУТЫЛОЧКА</Text>
             <TouchableOpacity
               style={[styles.btn, isSpinning && styles.btnActive]}
-              onPress={handleStartRoulette}
+              onPress={handleStartBottleSpin}
               disabled={isSpinning}
               activeOpacity={0.7}
             >
@@ -472,14 +475,10 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
 
           <View style={styles.resultBadge}>
             <Text style={styles.resultBadgeText}>
-              {winnerArc !== null
-                ? `ВЫБРАН СЕКТОР: ${
-                    winnerArc === 0
-                      ? 'ВЕРХ-ЛЕВО'
-                      : winnerArc === 1
-                      ? 'НИЗ-ЛЕВО'
-                      : 'ПРАВЫЙ'
-                  }`
+              {isSpinning
+                ? 'ВРАЩЕНИЕ...'
+                : winnerPixel !== null
+                ? `ВЫБРАН LED #${winnerPixel} (${getWinnerPixelZone(winnerPixel)})`
                 : 'НАЖМИТЕ «КРУТИТЬ» ДЛЯ ЗАПУСКА'}
             </Text>
           </View>
@@ -489,12 +488,7 @@ export default function UtilitiesScreen({ brightness, onBrightnessChange }) {
       {/* GAME 2: REFLEX TEST */}
       <LiquidGlassCard isActive={activeMode === 'reflex'}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>ТЕСТ СКОРОСТИ РЕАКЦИИ</Text>
-            <Text style={styles.cardSubtitle}>
-              Нажмите при внезапной белой вспышке
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>ТЕСТ СКОРОСТИ РЕАКЦИИ</Text>
           {bestTime > 0 && (
             <View style={styles.bestTimeBadge}>
               <Text style={styles.bestTimeText}>РЕКОРД: {bestTime} МС</Text>
@@ -562,12 +556,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1.2,
   },
-  cardSubtitle: {
-    fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#8E8E98',
-    marginTop: 1,
-  },
   btn: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -630,13 +618,8 @@ const styles = StyleSheet.create({
     color: '#D0D0DC',
     letterSpacing: 1.2,
   },
-  arcadeSectionMeta: {
-    fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#707080',
-  },
   rouletteBox: {
-    gap: 10,
+    gap: 8,
   },
   resultBadge: {
     paddingHorizontal: 14,
@@ -649,9 +632,9 @@ const styles = StyleSheet.create({
   },
   resultBadgeText: {
     fontFamily: 'NDOT57',
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   bestTimeBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -666,7 +649,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   reflexPad: {
-    height: 120,
+    height: 110,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
@@ -692,9 +675,9 @@ const styles = StyleSheet.create({
   },
   reflexMainText: {
     fontFamily: 'NDOT57',
-    fontSize: 16,
+    fontSize: 15,
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1.8,
   },
   reflexMainTextFlash: {
     color: '#000000',
@@ -702,7 +685,7 @@ const styles = StyleSheet.create({
   },
   reflexSubText: {
     fontFamily: 'NDOT57',
-    fontSize: 9.5,
+    fontSize: 9,
     color: '#8E8E98',
     letterSpacing: 1,
     marginTop: 6,

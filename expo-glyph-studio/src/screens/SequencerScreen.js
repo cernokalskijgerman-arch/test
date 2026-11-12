@@ -8,40 +8,39 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from '../components/LiquidGlassCard';
-import GlyphSlider from '../components/GlyphSlider';
 import { GlyphColors } from '../theme/colors';
 
 const PRESETS = {
   cyber: {
-    name: 'CYBER METRO',
+    name: 'CYBER',
     topleft: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
     bottomleft: [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
     right: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
     bpm: 128,
   },
   heartbeat: {
-    name: 'HEARTBEAT',
+    name: 'PULSE',
     topleft: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
     bottomleft: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
     right: [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
     bpm: 90,
   },
   strobe: {
-    name: 'STROBE WAVE',
+    name: 'STROBE',
     topleft: [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     bottomleft: [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     right: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
     bpm: 140,
   },
   techno: {
-    name: 'TECHNO ROLL',
+    name: 'TECHNO',
     topleft: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1],
     bottomleft: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
     right: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0],
     bpm: 134,
   },
   echo: {
-    name: 'MINIMAL ECHO',
+    name: 'ECHO',
     topleft: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     bottomleft: [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
     right: [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
@@ -50,8 +49,9 @@ const PRESETS = {
 };
 
 /**
- * Screen 3: «СЕКВЕНСОР»
- * 16-step rhythmic pattern sequencer across all 3 Glyph arcs.
+ * Screen 3: «СЕКВЕНСОР» (Матрица полей)
+ * Compact 16-step rhythmic pattern matrix across all 3 Glyph arcs.
+ * Fits on a single screen without vertical scrolling.
  */
 export default function SequencerScreen({ brightness, onBrightnessChange }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -155,12 +155,14 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      bounces={false}
     >
       {/* ============================================================ */}
-      {/* 1. TRANSPORT & BPM CONTROL                                   */}
+      {/* 1. COMPACT TRANSPORT & PRESETS BAR                           */}
       {/* ============================================================ */}
-      <LiquidGlassCard isActive={isPlaying}>
+      <LiquidGlassCard isActive={isPlaying} style={styles.topCard}>
         <View style={styles.transportRow}>
+          {/* Play / Stop Button */}
           <TouchableOpacity
             style={[styles.playBtn, isPlaying && styles.playBtnActive]}
             onPress={() => {
@@ -174,63 +176,69 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
             </Text>
           </TouchableOpacity>
 
+          {/* Compact BPM Stepper */}
+          <View style={styles.bpmBox}>
+            <TouchableOpacity
+              style={styles.bpmArrowBtn}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setBpm((b) => Math.max(60, b - 4));
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.bpmArrowText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.bpmValueText}>{bpm} BPM</Text>
+            <TouchableOpacity
+              style={styles.bpmArrowBtn}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setBpm((b) => Math.min(220, b + 4));
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.bpmArrowText}>+</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Step Indicator */}
           <View style={styles.stepCounterBox}>
             <Text style={styles.stepCounterText}>
-              ШАГ {isPlaying ? `${currentStep + 1} / 16` : 'ГОТОВ'}
+              {isPlaying ? `${currentStep + 1}/16` : '16 ШАГОВ'}
             </Text>
           </View>
 
+          {/* Clear Button */}
           <TouchableOpacity style={styles.clearBtn} onPress={clearAll} activeOpacity={0.7}>
-            <Text style={styles.clearBtnText}>ОЧИСТИТЬ</Text>
+            <Text style={styles.clearBtnText}>СБРОС</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.divider} />
-
-        {/* Liquid Glass BPM Slider */}
-        <GlyphSlider
-          label="ТЕМП ВОСПРОИЗВЕДЕНИЯ"
-          value={bpm}
-          min={60}
-          max={220}
-          step={2}
-          unit=" BPM"
-          displayValue={`${bpm} BPM`}
-          accentColor={GlyphColors.neonRed}
-          onValueChange={(newBpm) => setBpm(newBpm)}
-        />
-
-        {/* Presets Row */}
-        <View style={styles.presetLabelRow}>
-          <Text style={styles.presetSectionLabel}>ПРЕСЕТЫ ПАТТЕРНОВ</Text>
+        {/* Compact Presets Row */}
+        <View style={styles.presetsRow}>
+          {Object.keys(PRESETS).map((key) => {
+            const p = PRESETS[key];
+            const isSelected = activePreset === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.presetBtn, isSelected && styles.presetBtnActive]}
+                onPress={() => loadPreset(key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.presetBtnText, isSelected && styles.presetBtnTextActive]}>
+                  {p.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.presetsScroll}>
-          <View style={styles.presetsList}>
-            {Object.keys(PRESETS).map((key) => {
-              const p = PRESETS[key];
-              const isSelected = activePreset === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.presetBtn, isSelected && styles.presetBtnActive]}
-                  onPress={() => loadPreset(key)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.presetBtnText, isSelected && styles.presetBtnTextActive]}>
-                    {p.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
       </LiquidGlassCard>
 
       {/* ============================================================ */}
-      {/* 2. 16-STEP RHYTHM GRID                                       */}
+      {/* 2. 16-STEP RHYTHM MATRIX (3 TRACKS)                          */}
       {/* ============================================================ */}
-      <LiquidGlassCard>
-        <Text style={styles.matrixHeaderTitle}>МАТРИЦА ШАГОВ (16 ДОЛЕЙ)</Text>
+      <LiquidGlassCard style={styles.matrixCard}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.matrix}>
             {/* Step header markers */}
@@ -263,7 +271,6 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
             <View style={styles.trackRow}>
               <View style={styles.trackLabelBox}>
                 <Text style={styles.trackLabel}>ВЕРХ-ЛЕВО</Text>
-                <Text style={styles.trackSubLabel}>#0..19</Text>
               </View>
               {tracks.topleft.map((val, i) => (
                 <TouchableOpacity
@@ -283,7 +290,6 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
             <View style={styles.trackRow}>
               <View style={styles.trackLabelBox}>
                 <Text style={styles.trackLabel}>НИЗ-ЛЕВО</Text>
-                <Text style={styles.trackSubLabel}>#31..35</Text>
               </View>
               {tracks.bottomleft.map((val, i) => (
                 <TouchableOpacity
@@ -302,8 +308,7 @@ export default function SequencerScreen({ brightness, onBrightnessChange }) {
             {/* Track 3: Right Arc */}
             <View style={styles.trackRow}>
               <View style={styles.trackLabelBox}>
-                <Text style={styles.trackLabel}>ПРАВАЯ</Text>
-                <Text style={styles.trackSubLabel}>#20..30</Text>
+                <Text style={styles.trackLabel}>ПРАВЫЙ</Text>
               </View>
               {tracks.right.map((val, i) => (
                 <TouchableOpacity
@@ -335,15 +340,20 @@ const styles = StyleSheet.create({
     paddingBottom: 115,
     gap: 8,
   },
+  topCard: {
+    paddingVertical: 8,
+  },
   transportRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 8,
   },
   playBtn: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    borderRadius: 8,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
   playBtnActive: {
@@ -351,75 +361,87 @@ const styles = StyleSheet.create({
   },
   playBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#000000',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   playBtnTextActive: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
+  bpmBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 6,
+  },
+  bpmArrowBtn: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  bpmArrowText: {
+    fontFamily: 'NDOT57',
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  bpmValueText: {
+    fontFamily: 'NDOT57',
+    fontSize: 9,
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+  },
   stepCounterBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 7,
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
   stepCounterText: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#D0D0DC',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   clearBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
   },
   clearBtnText: {
     fontFamily: 'NDOT57',
     fontSize: 8,
     color: '#8E8E98',
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginVertical: 6,
-  },
-  presetLabelRow: {
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  presetSectionLabel: {
-    fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#808090',
-    letterSpacing: 1,
-  },
-  presetsScroll: {
-    marginHorizontal: -4,
-  },
-  presetsList: {
+  presetsRow: {
     flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 4,
+    gap: 5,
   },
   presetBtn: {
-    paddingHorizontal: 12,
+    flex: 1,
     paddingVertical: 6,
-    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   presetBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
     borderColor: '#FFFFFF',
   },
   presetBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
+    fontSize: 7.5,
     color: '#8E8E98',
     letterSpacing: 0.8,
   },
@@ -427,87 +449,83 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  matrixHeaderTitle: {
-    fontFamily: 'NDOT57',
-    fontSize: 11,
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-    marginBottom: 8,
+  matrixCard: {
+    paddingVertical: 8,
   },
   matrix: {
-    paddingVertical: 4,
+    gap: 5,
   },
   stepHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   trackLabelBox: {
-    width: 78,
+    width: 68,
+    justifyContent: 'center',
   },
   headerLabel: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
+    fontSize: 7.5,
     color: '#666675',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   stepNumBox: {
-    width: 32,
-    height: 24,
-    borderRadius: 6,
+    width: 22,
+    height: 18,
+    marginHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 4,
+    backgroundColor: 'transparent',
   },
   stepNumQuarter: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderBottomWidth: 1.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.35)',
   },
   stepNumActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: GlyphColors.neonRed,
+    borderRadius: 4,
   },
   stepNumText: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#666675',
+    fontSize: 7.5,
+    color: '#555565',
   },
   stepNumTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   trackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
   },
   trackLabel: {
     fontFamily: 'NDOT57',
-    fontSize: 9.5,
-    color: '#FFFFFF',
+    fontSize: 8,
+    color: '#D0D0DC',
     letterSpacing: 0.8,
   },
-  trackSubLabel: {
-    fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#666675',
-  },
   stepCell: {
-    width: 32,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    width: 22,
+    height: 26,
+    marginHorizontal: 2,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   stepCellOn: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
     shadowColor: '#FFFFFF',
-    shadowOpacity: 0.7,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.75,
     shadowRadius: 6,
+    elevation: 4,
   },
   stepCellPlaying: {
     borderColor: GlyphColors.neonRed,
-    borderWidth: 2,
+    borderWidth: 1.8,
   },
 });

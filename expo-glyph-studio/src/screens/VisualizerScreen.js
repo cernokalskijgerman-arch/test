@@ -117,12 +117,7 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
       {/* ============================================================ */}
       <LiquidGlassCard isActive={isActive}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>FFT ВИЗУАЛИЗАТОР МУЗЫКИ</Text>
-            <Text style={styles.subtitle}>
-              Реакция глифов на частотный спектр звука
-            </Text>
-          </View>
+          <Text style={styles.title}>FFT ВИЗУАЛИЗАТОР МУЗЫКИ</Text>
           <TouchableOpacity
             style={[styles.toggleBtn, isActive && styles.toggleBtnActive]}
             onPress={() => {

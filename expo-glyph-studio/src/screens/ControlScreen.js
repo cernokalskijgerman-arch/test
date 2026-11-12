@@ -84,16 +84,11 @@ export default function ControlScreen({
         <View style={styles.masterRow}>
           <View style={styles.masterTitleRow}>
             <View style={[styles.statusDot, isAnyOn && styles.statusDotActive]} />
-            <View>
-              <Text style={styles.masterTitle}>
-                {isAnyOn
-                  ? `ГЛИФ: ВКЛ (${Math.round((masterBrightness / 255) * 100)}%)`
-                  : 'ГЛИФ: ОТКЛЮЧЕН'}
-              </Text>
-              <Text style={styles.masterSubtitle}>
-                Общее управление подсветкой камеры
-              </Text>
-            </View>
+            <Text style={styles.masterTitle}>
+              {isAnyOn
+                ? `ГЛИФ: ВКЛ (${Math.round((masterBrightness / 255) * 100)}%)`
+                : 'ГЛИФ: ОТКЛЮЧЕН'}
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -165,7 +160,6 @@ export default function ControlScreen({
       {/* ============================================================ */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionHeader}>ДУГИ СВЕЧЕНИЯ NOTHING</Text>
-        <Text style={styles.sectionHeaderMeta}>3 независимых канала</Text>
       </View>
 
       {/* ARC 0: TOP-LEFT */}
@@ -175,12 +169,7 @@ export default function ControlScreen({
             <View
               style={[styles.arcDot, brightness[0] > 10 && styles.arcDotActive]}
             />
-            <View>
-              <Text style={styles.arcTitle}>ВЕРХ-ЛЕВО (20 LED)</Text>
-              <Text style={styles.arcSubtitle}>
-                Канал #0..19 • Дуга над оптикой (198°..239°)
-              </Text>
-            </View>
+            <Text style={styles.arcTitle}>ВЕРХ-ЛЕВО (20 LED)</Text>
           </View>
           <TouchableOpacity
             style={[styles.arcToggleBtn, brightness[0] > 10 && styles.arcToggleBtnActive]}
@@ -217,12 +206,7 @@ export default function ControlScreen({
             <View
               style={[styles.arcDot, brightness[1] > 10 && styles.arcDotActive]}
             />
-            <View>
-              <Text style={styles.arcTitle}>НИЗ-ЛЕВО (5 LED)</Text>
-              <Text style={styles.arcSubtitle}>
-                Канал #31..35 • Нижний сектор (134°..155°)
-              </Text>
-            </View>
+            <Text style={styles.arcTitle}>НИЗ-ЛЕВО (5 LED)</Text>
           </View>
           <TouchableOpacity
             style={[styles.arcToggleBtn, brightness[1] > 10 && styles.arcToggleBtnActive]}
@@ -259,12 +243,7 @@ export default function ControlScreen({
             <View
               style={[styles.arcDot, brightness[2] > 10 && styles.arcDotActive]}
             />
-            <View>
-              <Text style={styles.arcTitle}>ПРАВЫЙ (11 LED)</Text>
-              <Text style={styles.arcSubtitle}>
-                Канал #20..30 • Дуга перископа (-16°..32°)
-              </Text>
-            </View>
+            <Text style={styles.arcTitle}>ПРАВЫЙ (11 LED)</Text>
           </View>
           <TouchableOpacity
             style={[styles.arcToggleBtn, brightness[2] > 10 && styles.arcToggleBtnActive]}

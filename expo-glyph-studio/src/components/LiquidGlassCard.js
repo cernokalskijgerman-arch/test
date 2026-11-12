@@ -74,17 +74,17 @@ export default function LiquidGlassCard({
     >
       {/* 1. Frosted Blur Background (Hardware accelerated on iOS and Android) */}
       <BlurView
-        intensity={Platform.OS === 'ios' ? intensity : Math.min(intensity, 35)}
+        intensity={Platform.OS === 'ios' ? 25 : 18}
         tint="dark"
         style={[StyleSheet.absoluteFill, { borderRadius }]}
       />
 
-      {/* 2. Liquid Glass physical specular sheen gradient (identical to Tab Bar) */}
+      {/* 2. Liquid Glass physical specular sheen gradient (99% transparent glass) */}
       <LinearGradient
         colors={[
-          'rgba(255, 255, 255, 0.20)',
-          'rgba(255, 255, 255, 0.02)',
-          'rgba(0, 0, 0, 0.40)',
+          'rgba(255, 255, 255, 0.08)',
+          'rgba(255, 255, 255, 0.01)',
+          'rgba(0, 0, 0, 0.02)',
         ]}
         locations={[0, 0.45, 1]}
         start={{ x: 0, y: 0 }}
@@ -96,12 +96,11 @@ export default function LiquidGlassCard({
       {/* 3. Diagonal secondary prism sheen */}
       <LinearGradient
         colors={[
-          'rgba(255, 255, 255, 0.12)',
-          'rgba(255, 255, 255, 0.02)',
+          'rgba(255, 255, 255, 0.04)',
           'transparent',
-          'rgba(255, 255, 255, 0.02)',
+          'rgba(255, 255, 255, 0.01)',
         ]}
-        locations={[0, 0.3, 0.7, 1]}
+        locations={[0, 0.4, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0.8 }}
         style={[StyleSheet.absoluteFill, { borderRadius }]}
@@ -170,30 +169,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    backgroundColor: 'rgba(14, 16, 24, 0.68)',
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.015)', // ~99% transparent Liquid Glass
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 8,
+        elevation: 3,
       },
     }),
   },
   activeOuter: {
-    borderColor: 'rgba(255, 255, 255, 0.40)',
+    borderColor: 'rgba(255, 255, 255, 0.32)',
     ...Platform.select({
       ios: {
         shadowColor: '#FFFFFF',
-        shadowOpacity: 0.18,
-        shadowRadius: 12,
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 10,
+        elevation: 5,
       },
     }),
   },
@@ -202,8 +201,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 10,
     right: 10,
-    height: 1.2,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   activeHaloRim: {
     ...StyleSheet.absoluteFillObject,

@@ -28,7 +28,7 @@ import UtilitiesScreen from './src/screens/UtilitiesScreen';
 
 const TABS = [
   { id: 0, label: 'КОНТРОЛЬ', subtitle: 'Питание, яркость и 3 дуги' },
-  { id: 1, label: 'ПИКСЕЛИ', subtitle: '36 LED и авто-обход' },
+  { id: 1, label: 'АВТО-ОБХОД', subtitle: 'Бегущий свет 36 LED' },
   { id: 2, label: 'СЕКВЕНСОР', subtitle: '16-шаговые ритмы' },
   { id: 3, label: 'МУЗЫКА', subtitle: 'FFT визуализатор частот' },
   { id: 4, label: 'УТИЛИТЫ', subtitle: 'Фонарик, таймер, аркада' },
@@ -198,7 +198,7 @@ export default function App() {
     nextB[arc] = b;
     setBrightness(nextB);
 
-    const speed = Math.max(20, autoWalkSpeedRef.current || 80);
+    const speed = Math.max(5, autoWalkSpeedRef.current || 60);
     stepTimerRef.current = setTimeout(triggerWalkStep, speed);
   }, []);
 
@@ -329,7 +329,7 @@ export default function App() {
   // Live status previews for Category Switcher
   const categoryStats = {
     0: masterBrightness > 0 ? `${Math.round((masterBrightness / 255) * 100)}% ЯРКОСТЬ` : 'ВЫКЛ',
-    1: isAutoWalk ? `АВТО ${autoWalkSpeed}МС` : (activePixel !== null ? `LED #${activePixel}` : '36 LED'),
+    1: isAutoWalk ? `АВТО ${autoWalkSpeed}МС` : 'ГОТОВ',
     2: '16 ШАГОВ',
     3: 'FFT СПЕКТР',
     4: 'ИНСТРУМЕНТЫ',
@@ -389,8 +389,6 @@ export default function App() {
         )}
         {currentTab === 1 && (
           <PixelsScreen
-            activePixel={activePixel}
-            onActivePixelChange={handleActivePixelChange}
             isAutoWalk={isAutoWalk}
             onToggleAutoWalk={handleToggleAutoWalk}
             autoWalkSpeed={autoWalkSpeed}
@@ -415,6 +413,7 @@ export default function App() {
           <UtilitiesScreen
             brightness={brightness}
             onBrightnessChange={setBrightness}
+            onActivePixelChange={handleActivePixelChange}
           />
         )}
       </Animated.View>
