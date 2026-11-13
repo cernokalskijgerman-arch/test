@@ -24,64 +24,94 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: expo-glyph-studio/package.json
 
-      - name: Build Debug APK with Gradle
+      - name: Install Expo Dependencies
+        run: |
+          cd expo-glyph-studio
+          npm ci
+
+      - name: Grant Execute Permission for Gradlew
+        run: |
+          chmod +x gradlew
+          if [ -f expo-glyph-studio/android/gradlew ]; then chmod +x expo-glyph-studio/android/gradlew; fi
+
+      - name: Build Native Hardware APK with Gradle
         run: |
           set -o pipefail
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Generate Native Android Project for Expo
+        run: |
+          cd expo-glyph-studio
+          npx expo prebuild --platform android --no-install
+          cd ..
+          chmod +x expo-glyph-studio/android/gradlew
+
+      - name: Build Liquid Glass Studio APK with Gradle
+        run: |
+          cd expo-glyph-studio/android
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../../expo-build.log
+          cd ../..
 
       - name: Output Build Failure to Summary
         if: failure()
         run: |
           echo "### ❌ Gradle Build Failure Log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY
+          if [ -f gradle-build.log ]; then tail -n 60 gradle-build.log >> $GITHUB_STEP_SUMMARY; fi
+          if [ -f expo-build.log ]; then tail -n 60 expo-build.log >> $GITHUB_STEP_SUMMARY; fi
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-build-log
-          path: gradle-build.log
-          retention-days: 7
-
-      - name: Prepare APK for Release
+      - name: Prepare APKs for Release
         run: |
           mkdir -p release-apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-apk/NothingGlyphStudio-debug.apk
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk release-apk/NothingGlyphStudio-Hardware.apk
+            cp app/build/outputs/apk/debug/app-debug.apk release-apk/NothingGlyphStudio-debug.apk
+          fi
+          if [ -f expo-glyph-studio/android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp expo-glyph-studio/android/app/build/outputs/apk/release/app-release.apk release-apk/GlyphStudio-LiquidGlass.apk
+          fi
 
-      - name: Upload APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NothingGlyphStudio-debug-apk
-          path: release-apk/NothingGlyphStudio-debug.apk
+          name: GlyphStudio-APKs
+          path: release-apk/*.apk
           retention-days: 30
 
-      - name: Create GitHub Release with APK
+      - name: Create GitHub Release with APKs
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "Nothing Glyph Studio APK (v1.0.${{ github.run_number }})"
           body: |
-            ### 📱 Nothing Glyph Studio — Аппаратный тест совместимости глифов
+            ### 📱 Nothing Glyph Studio — Установочные пакеты APK
+
+            В этом релизе доступны два варианта APK:
             
-            Мини-версия для моментальной проверки работы глифов на вашем **Nothing Phone (3a Pro / 2a / 2 / 1)**:
-            - 💡 **Тест 1**: Включение / выключение всех глифов сразу (слайдер яркости 0..100%).
-            - 🔘 **Тест 2**: Независимое включение/выключение каждого глифа/дуги по отдельности (Дуга 1: Верх-Лево, Дуга 2: Низ-Лево, Дуга 3: Справа).
-            - 🔢 **Тест 3**: Поканальный тест каждого одиночного светодиода + круговой авто-обход.
-            - ⚡ **Тест 4**: Стробоскоп (10 Гц быстрая пульсация).
-            - 🍾 **Тест 5**: Аркада «Световая бутылочка» (круговое вращение с физикой трения и победной вспышкой).
-            - 🌊 **Тест 6**: Плавное свечение / дыхание (синусоида 0..255..0 без мерцания PWM).
-            - 🔍 **Диагностика**: Статус IPC Glyph Service, распознавание модели (DEVICE_24111) и лог вызовов SDK в реальном времени.
+            1. **`GlyphStudio-LiquidGlass.apk`** — Полная автономная версия приложения:
+               - ✨ **Liquid Glass интерфейс** (стиль iOS 18 / Nothing OS).
+               - 🎮 **Аркада «Меткий глиф»** с комбо-очками и тактильным откликом.
+               - 💫 **Анимация «Комета»** и **«Блеск»** на частоте 120 Гц.
+               - 🧘 **Дыхание Zen (4-7-8)** и тактический маяк Морзе (SOS).
+               - 🎛 **8-шаговый секвенсор** и FFT визуализатор музыки.
             
-            #### 📥 Как установить:
-            1. Скачайте файл **`NothingGlyphStudio-debug.apk`** ниже на ваш смартфон.
-            2. Откройте скачанный файл и подтвердите установку («Разрешить установку из этого источника»).
-            3. Запустите приложение и проверьте работу глифов на задней панели!
-          files: release-apk/NothingGlyphStudio-debug.apk
+            2. **`NothingGlyphStudio-Hardware.apk`** — Прямой аппаратный контроллер глифов через Nothing SDK 2.0.
+
+            ---
+
+            #### ⚠️ Если при установке пишет «Приложение не установлено»:
+            1. **Удалите старую версию с телефона**: зажмите иконку приложения на рабочем столе и нажмите **«Удалить»** (так как у новой сборки обновлена цифровая подпись).
+            2. **Play Защита**: при появлении предупреждения нажмите **«Подробнее» ➔ «Всё равно установить»**.
+            3. **Разрешите установку неизвестных приложений** в настройках вашего браузера или файлового менеджера.
+          files: release-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

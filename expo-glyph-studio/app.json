@@ -14,10 +14,12 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.nothing.glyphstudio.liquid",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png"
-      }
+      },
+      "package": "com.anonymous.glyphstudio"
     },
     "web": {
       "favicon": "./assets/favicon.png"
