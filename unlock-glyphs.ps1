@@ -59,17 +59,39 @@ if ($val -eq "1") {
     Write-Host "[ПРЕДУПРЕЖДЕНИЕ] Команда выполнена, значение: $val" -ForegroundColor Yellow
 }
 
+# Check Battery Saver mode (Nothing OS silences glyphs when low_power is active)
+$lowPower = (& $adbPath shell settings get global low_power 2>$null).Trim()
+if ($lowPower -eq "1") {
+    Write-Host "[ВНИМАНИЕ] На телефоне включен 'Режим энергосбережения'! В этом режиме Nothing OS блокирует глифы." -ForegroundColor Red
+    Write-Host "--> Отключите режим экономии энергии в шторке или настройках батареи!" -ForegroundColor Yellow
+}
+
+# Ensure Glyph Interface is enabled in Nothing OS
+& $adbPath shell settings put secure glyph_interface_enable 1 2>$null
+& $adbPath shell settings put global glyph_interface_enable 1 2>$null
+
 Write-Host ""
 Write-Host "ШАГ 3: ОБНОВЛЕНИЕ И УСТАНОВКА ТЕСТОВОГО APK НА СМАРТФОН..." -ForegroundColor Yellow
 
 $downloadLatest = $true
-$releaseUrl = "https://github.com/cernokalskijgerman-arch/test/releases/latest/download/NothingGlyphStudio-debug.apk"
+$releaseUrls = @(
+    "https://github.com/cernokalskijgerman-arch/test/releases/latest/download/NothingGlyphStudio-Hardware.apk",
+    "https://github.com/cernokalskijgerman-arch/test/releases/latest/download/NothingGlyphStudio-debug.apk"
+)
 Write-Host "Проверка и загрузка свежей сборки APK с GitHub Releases..." -ForegroundColor White
-try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $releaseUrl -OutFile $apkPath -UseBasicParsing -TimeoutSec 30
-    Write-Host "[+] Самый свежий APK успешно скачан с GitHub!" -ForegroundColor Green
-} catch {
+$downloadSuccess = $false
+foreach ($url in $releaseUrls) {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $url -OutFile $apkPath -UseBasicParsing -TimeoutSec 30
+        Write-Host "[+] Самый свежий APK успешно скачан с GitHub ($url)!" -ForegroundColor Green
+        $downloadSuccess = $true
+        break
+    } catch {
+        # Try next URL
+    }
+}
+if (-not $downloadSuccess) {
     if (Test-Path $apkPath) {
         Write-Host "[-] Не удалось обновить из сети (возможно сборка GitHub Actions еще идет). Используем локальный APK." -ForegroundColor Gray
     } else {

@@ -77,6 +77,7 @@ fun GlyphTestScreen(
     val currentFrame by GlyphController.currentFrame.collectAsState()
     val activeAnimation by GlyphController.activeAnimation.collectAsState()
     val diagnosticLogs by GlyphController.diagnosticLogs.collectAsState()
+    val isNtDebugEnabled by GlyphController.isNtDebugEnabled.collectAsState()
 
     var masterBrightness by remember { mutableFloatStateOf(255f) }
     var autoWalkSpeed by remember { mutableFloatStateOf(80f) }
@@ -228,6 +229,47 @@ fun GlyphTestScreen(
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
                 )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Nothing OS Debug Status
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (isNtDebugEnabled) Color(0xFF00FF66) else Color(0xFFFFCC00))
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isNtDebugEnabled) "Nothing OS Debug: РАЗРЕШЕНО (nt_glyph_interface_debug_enable=1)"
+                               else "Nothing OS Debug: ЗАБЛОКИРОВАНО (nt_glyph_interface_debug_enable=0)",
+                        color = if (isNtDebugEnabled) Color(0xFF00FF66) else Color(0xFFFFCC00),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (!isNtDebugEnabled) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x2AEDB810))
+                            .border(1.dp, Color(0x66EDB810), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "⚡ Чтобы физические светодиоды Nothing Phone светились, Nothing OS требует включить режим отладки: запустите файл unlock-glyphs.bat на ПК, либо команду:\nadb shell settings put global nt_glyph_interface_debug_enable 1",
+                            color = Color(0xFFFFE57F),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 12.sp
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 

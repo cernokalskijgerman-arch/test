@@ -53,10 +53,13 @@ object GlyphController {
     private val _isHardwareConnected = MutableStateFlow(false)
     val isHardwareConnected: StateFlow<Boolean> = _isHardwareConnected.asStateFlow()
 
+    private val _isNtDebugEnabled = MutableStateFlow(false)
+    val isNtDebugEnabled: StateFlow<Boolean> = _isNtDebugEnabled.asStateFlow()
+
     private val _detectedModel = MutableStateFlow("Определение устройства...")
     val detectedModel: StateFlow<String> = _detectedModel.asStateFlow()
 
-    private val _activeDevice = MutableStateFlow(NothingDevice.PHONE_3A_PRO)
+    private val _activeDevice = MutableStateFlow(NothingDevice.PHONE_2A)
     val activeDevice: StateFlow<NothingDevice> = _activeDevice.asStateFlow()
 
     private val _currentFrame = MutableStateFlow(GlyphFrame())
@@ -101,11 +104,33 @@ object GlyphController {
         val brand = Build.BRAND
         log("INFO", "Инициализация контроллера. Устройство: $brand $model")
 
+        // 0. Check Nothing OS Global Debug Setting (nt_glyph_interface_debug_enable)
+        checkNtDebugSetting(context)
+
         // 1. Detect target device model
         detectDeviceModel(context)
 
         // 2. Initialize official Ketchum GlyphManager
         initKetchumHardware(context.applicationContext)
+    }
+
+    fun checkNtDebugSetting(context: Context): Boolean {
+        val enabled = try {
+            android.provider.Settings.Global.getInt(
+                context.contentResolver,
+                "nt_glyph_interface_debug_enable",
+                0
+            ) == 1
+        } catch (e: Throwable) {
+            false
+        }
+        _isNtDebugEnabled.value = enabled
+        if (enabled) {
+            log("SUCCESS", "✅ Nothing OS Debug Setting: nt_glyph_interface_debug_enable = 1 (АКТИВИРОВАНО)")
+        } else {
+            log("WARN", "⚠️ Nothing OS Debug Setting: nt_glyph_interface_debug_enable = 0 (ОТКЛЮЧЕНО). Для физических глифов требуется включить через ADB!")
+        }
+        return enabled
     }
 
     private fun detectDeviceModel(context: Context) {
@@ -117,11 +142,11 @@ object GlyphController {
         val is25111 = try { Common.is25111() } catch (e: Throwable) { false }
 
         val detectedTarget = when {
-            is24111 || model.contains("3a") || model.contains("a059") -> NothingDevice.PHONE_3A_PRO
-            is23111 || model.contains("2a") || model.contains("a142") -> NothingDevice.PHONE_2A
-            is22111 || model.contains("pong") || model.contains("phone (2)") || model.contains("a065") -> NothingDevice.PHONE_2
+            is23111 || model.contains("2a") || model.contains("a142") || model.contains("pacman") -> NothingDevice.PHONE_2A
+            is22111 || model.contains("pong") || model.contains("phone (2)") || model.contains("a065") || model.contains("ain065") -> NothingDevice.PHONE_2
             is20111 || model.contains("spacewar") || model.contains("phone (1)") || model.contains("a063") -> NothingDevice.PHONE_1
-            else -> NothingDevice.PHONE_3A_PRO
+            is24111 || model.contains("3a") || model.contains("a059") || model.contains("phone (3)") -> NothingDevice.PHONE_3A_PRO
+            else -> NothingDevice.PHONE_2A // Safe default: Phone (2a) has 3-arc camera module matching user silhouette
         }
 
         _activeDevice.value = detectedTarget
@@ -187,26 +212,32 @@ object GlyphController {
 
     private fun registerAndOpenSession() {
         val manager = glyphManager ?: return
-        val targetCode = _activeDevice.value.deviceCode
+        val primaryTargetCode = _activeDevice.value.deviceCode
+
+        // Multi-device fallback candidate codes in order of likelihood
+        val candidateCodes = listOf(
+            primaryTargetCode,
+            "23111",
+            "22111",
+            "20111",
+            "24111",
+            "23113",
+            Build.MODEL
+        ).distinct()
 
         try {
-            log("INFO", "Вызов mGM.register('$targetCode')...")
             var registered = false
-            try {
-                registered = manager.register(targetCode)
-                log("INFO", "Результат mGM.register('$targetCode'): $registered")
-            } catch (e: Throwable) {
-                log("WARN", "mGM.register('$targetCode') выбросил: ${e.message}")
-            }
-
-            if (!registered) {
-                // If specific hardware code failed, try registering with Build.MODEL
-                log("WARN", "Попытка register('${Build.MODEL}')...")
+            for (code in candidateCodes) {
                 try {
-                    registered = manager.register(Build.MODEL)
-                    log("INFO", "Результат mGM.register('${Build.MODEL}'): $registered")
+                    log("INFO", "Попытка регистрации устройства с кодом '$code'...")
+                    registered = manager.register(code)
+                    log("INFO", "Результат mGM.register('$code'): $registered")
+                    if (registered) {
+                        log("SUCCESS", "Устройство успешно зарегистрировано с кодом '$code'!")
+                        break
+                    }
                 } catch (e: Throwable) {
-                    log("WARN", "mGM.register('${Build.MODEL}') выбросил: ${e.message}")
+                    log("WARN", "mGM.register('$code') выбросил: ${e.message}")
                 }
             }
 
@@ -218,6 +249,14 @@ object GlyphController {
                 } catch (e: Throwable) {
                     log("WARN", "mGM.register() выбросил: ${e.message}")
                 }
+            }
+
+            // Re-check Nothing OS debug state
+            appContext?.let { checkNtDebugSetting(it) }
+
+            if (!registered && !_isNtDebugEnabled.value) {
+                log("ERROR", "❌ Nothing OS отклонил регистрацию! Причина: nt_glyph_interface_debug_enable=0. Выполните unlock-glyphs.bat или: adb shell settings put global nt_glyph_interface_debug_enable 1")
+                _statusMessage.value = "Требуется отладка: выполните unlock-glyphs.bat"
             }
 
             // Open Session
@@ -248,10 +287,13 @@ object GlyphController {
                 }
             }
         } catch (e: Throwable) {
-            log("ERROR", "Ошибка регистрации Glyph сессии: ${e.javaClass.simpleName} - ${e.message}")
+            val debugWarning = if (!_isNtDebugEnabled.value) {
+                " [Внимание: nt_glyph_interface_debug_enable=0! Запустите unlock-glyphs.bat]"
+            } else ""
+            log("ERROR", "Ошибка регистрации Glyph сессии: ${e.javaClass.simpleName} - ${e.message}$debugWarning")
             _connectionState.value = HardwareConnectionState.ERROR
             _isHardwareConnected.value = false
-            _statusMessage.value = "Ошибка сессии: ${e.message}"
+            _statusMessage.value = "Ошибка сессии: ${e.message}$debugWarning"
         }
     }
 

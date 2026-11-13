@@ -51,10 +51,12 @@ enum class ScreenDestination {
 
 @Composable
 fun DashboardScreen(
-    onNavigate: (ScreenDestination) -> Unit
+    onNavigate: (ScreenDestination) -> Unit,
+    onNavigateTest: (() -> Unit)? = null
 ) {
     val activeDevice by GlyphController.activeDevice.collectAsState()
     val isHardwareConnected by GlyphController.isHardwareConnected.collectAsState()
+    val isNtDebugEnabled by GlyphController.isNtDebugEnabled.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -81,7 +83,7 @@ fun DashboardScreen(
                         letterSpacing = 2.sp
                     )
                     Text(
-                        text = "PHONE (3) MATRIX",
+                        text = activeDevice.displayName.uppercase(),
                         color = GlyphColors.NeonRed,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
@@ -89,31 +91,91 @@ fun DashboardScreen(
                     )
                 }
 
-                // Unified Status Badge
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isHardwareConnected) GlyphColors.DeepRedWine else Color(0x331C080B))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Test Bench Shortcut Pill
+                    if (onNavigateTest != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0x22FFFFFF))
+                                .clickable { onNavigateTest() }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "🧪 ТЕСТ",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
+                    // Unified Status Badge (clickable to test)
+                    Row(
                         modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (isHardwareConnected) GlyphColors.NeonRed else Color(0xFF888888))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isHardwareConnected) "HARDWARE" else "SIMULATOR",
-                        color = GlyphColors.TextWhite,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isHardwareConnected) GlyphColors.DeepRedWine else Color(0x331C080B))
+                            .clickable { onNavigateTest?.invoke() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (isHardwareConnected) Color(0xFF00FF66) else Color(0xFF888888))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isHardwareConnected) "HARDWARE" else "SIMULATOR",
+                            color = GlyphColors.TextWhite,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // Warning banner if Nothing OS debug setting is disabled
+        if (!isNtDebugEnabled) {
+            item {
+                LiquidGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    isActive = false,
+                    onClick = { onNavigateTest?.invoke() }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "⚠️", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "ГЛИФЫ НЕ СВЕТЯТСЯ: ТРЕБУЕТСЯ НАСТРОЙКА",
+                                color = Color(0xFFFFCC00),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "В Nothing OS включите режим отладки: запустите unlock-glyphs.bat или нажмите сюда для инструкций",
+                                color = GlyphColors.TextMuted,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 12.sp
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
         }
 
         // Live 2D Simulator Hero
