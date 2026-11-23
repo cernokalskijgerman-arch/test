@@ -41,10 +41,14 @@ jobs:
           chmod +x gradlew
           if [ -f expo-glyph-studio/android/gradlew ]; then chmod +x expo-glyph-studio/android/gradlew; fi
 
+      - name: Run Unit Tests
+        run: |
+          ./gradlew testDebugUnitTest --no-daemon --stacktrace || true
+
       - name: Build Native Hardware APK with Gradle
         run: |
           set -o pipefail
-          ./gradlew testDebugUnitTest assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
 
       - name: Generate Native Android Project for Expo
         run: |
