@@ -44,7 +44,7 @@ jobs:
       - name: Build Native Hardware APK with Gradle
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
 
       - name: Generate Native Android Project for Expo
         run: |
@@ -94,16 +94,17 @@ jobs:
           body: |
             ### 📱 Nothing Glyph Studio — Установочные пакеты APK
 
-            В этом релизе доступны два варианта APK:
+            В этом релизе:
             
-            1. **`GlyphStudio-LiquidGlass.apk`** — Полная автономная версия приложения:
-               - ✨ **Liquid Glass интерфейс** (стиль iOS 18 / Nothing OS).
-               - 🎮 **Аркада «Меткий глиф»** с комбо-очками и тактильным откликом.
-               - 💫 **Анимация «Комета»** и **«Блеск»** на частоте 120 Гц.
-               - 🧘 **Дыхание Zen (4-7-8)** и тактический маяк Морзе (SOS).
-               - 🎛 **8-шаговый секвенсор** и FFT визуализатор музыки.
+            1. **`NothingGlyphStudio-Hardware.apk`** (или **`NothingGlyphStudio-debug.apk`**) — **Основное аппаратное приложение Nothing**:
+               - ✨ **Liquid Glass интерфейс** в аутентичном минималистичном бело-черном стиле Nothing OS.
+               - 🍾 **«Световая бутылочка» (рулетка)**: круговое аппаратное вращение светового пикселя по глифам камеры, физика трения с нелинейным замедлением, тактильный отклик (haptics) и щелчки (audio ticking) на каждом шаге, праздничная победная пульсация и указатель направления на игрока.
+               - ⚡ **Glyph Reflex**: тест скорости реакции с аппаратной вспышкой всех глифов на 100% мощности (4095 lux).
+               - 🎛 **16-шаговый секвенсор** и FFT-эквалайзер частот (микрофон / бит).
+               - 🔋 **Утилиты**: таймер, индикатор заряда батареи, мягкий свет и стробоскоп.
+               - 🛠 **Авто-подключение к Ketchum SDK 2.0**: мгновенная инициализация сессии на Phone (3a Pro / 3), Phone (2a), Phone (2) и Phone (1).
             
-            2. **`NothingGlyphStudio-Hardware.apk`** — Прямой аппаратный контроллер глифов через Nothing SDK 2.0.
+            2. **`GlyphStudio-LiquidGlass.apk`** — Автономный прототип интерфейса.
 
             ---
 

@@ -21,10 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = GlyphColors.NeonRed,
-    onPrimary = GlyphColors.TextWhite,
-    primaryContainer = GlyphColors.DeepRedWine,
-    onPrimaryContainer = GlyphColors.BrightRedGlow,
+    primary = GlyphColors.TextWhite,
+    onPrimary = GlyphColors.PureBlack,
+    primaryContainer = GlyphColors.SurfaceElevated,
+    onPrimaryContainer = GlyphColors.TextWhite,
     secondary = GlyphColors.NothingRed,
     onSecondary = GlyphColors.TextWhite,
     background = GlyphColors.AmoledBlack,
@@ -62,62 +62,37 @@ fun GlyphStudioTheme(
 }
 
 /**
- * Ultra-realistic Liquid Glass modifier with authentic glassmorphism:
- * - Top specular highlight (reflecting white light on the upper bevel)
- * - Translucent tinted glass body with inner depth
- * - Subtle red refraction border
- * - Diffuse colored glass drop-shadow
+ * Authentic Liquid Glass modifier matching Nothing OS & modern iOS glassmorphism:
+ * - Top specular rim highlight (reflecting pure light on the upper bevel)
+ * - Translucent frosted dark glass body
+ * - Specular border gradient
+ * - Ambient dark drop shadow
  */
 fun Modifier.liquidGlass(
-    shape: Shape = RoundedCornerShape(22.dp),
-    elevation: Dp = 10.dp,
-    borderWidth: Dp = 1.2.dp,
+    shape: Shape = RoundedCornerShape(20.dp),
+    elevation: Dp = 6.dp,
+    borderWidth: Dp = 1.dp,
     isActive: Boolean = false,
     isBoosted: Boolean = false
 ): Modifier {
     val glassBorderBrush = if (isActive) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xCCFFFFFF),
-                Color(0xFFFF2E3B),
-                Color(0x99FF2E3B)
-            )
-        )
+        GlyphColors.GlassSpecularActiveBorder
     } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0x4DFFFFFF),  // Specular top reflection
-                Color(0x1AFFFFFF),
-                Color(0x26FF2E3B),  // Red ambient refraction
-                Color(0x40FF2E3B)
-            )
-        )
+        GlyphColors.GlassSpecularBorder
     }
 
     val glassBackground = if (isActive) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0x663D0A12),
-                Color(0x3325060B),
-                Color(0x1F11080A)
-            )
-        )
+        GlyphColors.GlassSurfaceActiveGradient
     } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0x2E241216),
-                Color(0x1C140A0D),
-                Color(0x140B0B0E)
-            )
-        )
+        GlyphColors.GlassSurfaceGradient
     }
 
     return this
         .shadow(
             elevation = elevation,
             shape = shape,
-            spotColor = if (isActive) GlyphColors.NeonRed else Color(0x40FF2E3B),
-            ambientColor = Color(0x80000000)
+            spotColor = if (isActive) Color(0x66FFFFFF) else Color(0x33000000),
+            ambientColor = Color(0x66000000)
         )
         .clip(shape)
         .background(glassBackground)
@@ -127,3 +102,4 @@ fun Modifier.liquidGlass(
             shape = shape
         )
 }
+

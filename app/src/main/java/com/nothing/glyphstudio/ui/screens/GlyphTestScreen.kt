@@ -285,7 +285,7 @@ fun GlyphTestScreen(
                     )
                     Text(
                         text = "Светятся: $activeCount / $totalSegments",
-                        color = if (activeCount > 0) GlyphColors.NeonRed else GlyphColors.TextMuted,
+                        color = if (activeCount > 0) Color.White else GlyphColors.TextMuted,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
@@ -310,14 +310,14 @@ fun GlyphTestScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) GlyphColors.NeonRed else Color(0x22FFFFFF))
+                                .background(if (isSelected) Color.White else Color(0x22FFFFFF))
                                 .clickable { GlyphController.switchDevice(device) }
                                 .padding(vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = label,
-                                color = Color.White,
+                                color = if (isSelected) Color.Black else Color.White,
                                 fontSize = 8.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
@@ -361,12 +361,14 @@ fun GlyphTestScreen(
                             GlyphController.turnAllOn(masterBrightness.toInt())
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = GlyphColors.NeonRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
                             text = "💡 ВКЛ ВСЕ (MAX)",
-                            color = Color.White,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
@@ -443,8 +445,8 @@ fun GlyphTestScreen(
                     },
                     valueRange = 0f..255f,
                     colors = SliderDefaults.colors(
-                        thumbColor = GlyphColors.NeonRed,
-                        activeTrackColor = GlyphColors.NeonRed,
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
                         inactiveTrackColor = Color(0xFF33333C)
                     )
                 )
@@ -552,7 +554,7 @@ fun GlyphTestScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "КАНАЛ #$safeSelectedChannel",
-                            color = GlyphColors.NeonRed,
+                            color = Color.White,
                             fontSize = 15.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
@@ -560,7 +562,7 @@ fun GlyphTestScreen(
                         val zoneInfo = GlyphController.getChannelZoneDescription(activeDevice, safeSelectedChannel)
                         Text(
                             text = zoneInfo,
-                            color = Color.White,
+                            color = GlyphColors.TextMuted,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace
                         )
@@ -596,7 +598,8 @@ fun GlyphTestScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isAutoWalk) GlyphColors.NeonRed else Color(0xFF222228)
+                        containerColor = if (isAutoWalk) Color.White else Color(0x26FFFFFF),
+                        contentColor = if (isAutoWalk) Color.Black else Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -604,7 +607,7 @@ fun GlyphTestScreen(
                         imageVector = if (isAutoWalk) Icons.Default.Stop else Icons.Default.PlayArrow,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = Color.White
+                        tint = if (isAutoWalk) Color.Black else Color.White
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -891,10 +894,10 @@ private fun ZoneToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isOn) Color(0x33FF003C) else Color(0xFF14141A))
+            .background(if (isOn) Color(0x33FFFFFF) else Color(0xFF10121A))
             .border(
                 width = 1.dp,
-                color = if (isOn) GlyphColors.NeonRed else Color(0x22FFFFFF),
+                color = if (isOn) Color.White else Color(0x22FFFFFF),
                 shape = RoundedCornerShape(10.dp)
             )
             .clickable { onToggle() }
@@ -921,12 +924,12 @@ private fun ZoneToggleRow(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (isOn) GlyphColors.NeonRed else Color(0xFF26262E))
+                .background(if (isOn) Color.White else Color(0xFF26262E))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Text(
                 text = if (isOn) "ВКЛ" else "ВЫКЛ",
-                color = Color.White,
+                color = if (isOn) Color.Black else Color.White,
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
@@ -946,10 +949,10 @@ private fun AnimationCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isActive) Color(0x33FF003C) else Color(0xFF14141A))
+            .background(if (isActive) Color(0x33FFFFFF) else Color(0xFF10121A))
             .border(
                 width = 1.dp,
-                color = if (isActive) GlyphColors.NeonRed else Color(0x22FFFFFF),
+                color = if (isActive) Color.White else Color(0x22FFFFFF),
                 shape = RoundedCornerShape(10.dp)
             )
             .clickable { onToggle() }
@@ -960,7 +963,7 @@ private fun AnimationCard(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = if (isActive) GlyphColors.NeonRed else Color.White,
+                color = Color.White,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
@@ -979,12 +982,12 @@ private fun AnimationCard(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (isActive) GlyphColors.NeonRed else Color(0xFF26262E))
+                .background(if (isActive) Color.White else Color(0xFF26262E))
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Text(
                 text = if (isActive) "СТОП" else "СТАРТ",
-                color = Color.White,
+                color = if (isActive) Color.Black else Color.White,
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold

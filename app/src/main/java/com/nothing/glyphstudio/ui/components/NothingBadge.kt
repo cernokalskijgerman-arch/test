@@ -23,26 +23,27 @@ import androidx.compose.ui.unit.sp
 import com.nothing.glyphstudio.theme.GlyphColors
 
 /**
- * Unified Nothing-style micro-pill badge for tags, status indicators, and labels.
- * Enforces a singular, cohesive aesthetic: Monochrome + Signature Neon Red accents.
+ * Minimalist Nothing-style micro-pill badge for tags, status indicators, and labels.
+ * Monochromatic Liquid Glass styling with clean typography.
  */
 @Composable
 fun NothingBadge(
     text: String,
     modifier: Modifier = Modifier,
     isActive: Boolean = false,
-    isBoosted: Boolean = false
+    isBoosted: Boolean = false,
+    useRedAccent: Boolean = false
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isBoosted || isActive) GlyphColors.BadgeSurfaceActive else GlyphColors.BadgeSurface)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isActive) GlyphColors.BadgeSurfaceActive else GlyphColors.BadgeSurface)
             .border(
                 width = 1.dp,
-                color = if (isBoosted || isActive) GlyphColors.BadgeBorderActive else GlyphColors.BadgeBorder,
-                shape = RoundedCornerShape(6.dp)
+                color = if (isActive) GlyphColors.BadgeBorderActive else GlyphColors.BadgeBorder,
+                shape = RoundedCornerShape(8.dp)
             )
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -50,12 +51,18 @@ fun NothingBadge(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(if (isBoosted || isActive) GlyphColors.NeonRed else Color(0x66FFFFFF))
+                    .background(
+                        when {
+                            useRedAccent -> GlyphColors.NothingRed
+                            isActive -> Color.White
+                            else -> Color(0x66FFFFFF)
+                        }
+                    )
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = text.uppercase(),
-                color = if (isBoosted || isActive) GlyphColors.NeonRed else GlyphColors.BadgeText,
+                color = if (isActive) GlyphColors.TextWhite else GlyphColors.TextMuted,
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -64,3 +71,4 @@ fun NothingBadge(
         }
     }
 }
+

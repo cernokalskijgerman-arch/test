@@ -108,22 +108,19 @@ fun UtilitiesScreen(
                 )
                 Text(
                     text = if (activeUtil != ActiveUtility.NONE) "FOREGROUND ACTIVE" else "STANDBY",
-                    color = if (activeUtil != ActiveUtility.NONE) {
-                        if (isBoosted) GlyphColors.BoostPlasma else GlyphColors.NeonRed
-                    } else Color.Gray,
+                    color = if (activeUtil != ActiveUtility.NONE) Color.White else Color.Gray,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
             NothingBadge(
                 text = if (activeUtil != ActiveUtility.NONE) "SYSTEM ON" else "READY",
-                isActive = activeUtil != ActiveUtility.NONE,
-                isBoosted = isBoosted
+                isActive = activeUtil != ActiveUtility.NONE
             )
             if (activeUtil != ActiveUtility.NONE) {
                 Spacer(modifier = Modifier.width(6.dp))
                 IconButton(onClick = { stopAllService() }) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop", tint = GlyphColors.NeonRed)
+                    Icon(Icons.Default.Stop, contentDescription = "Stop", tint = Color.White)
                 }
             }
         }
@@ -134,8 +131,7 @@ fun UtilitiesScreen(
         GlyphSimulatorView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp),
-            isBoosted = isBoosted
+                .height(200.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -143,8 +139,7 @@ fun UtilitiesScreen(
         // Utility 1: Glyph Timer / Pomodoro
         LiquidGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            isActive = activeUtil == ActiveUtility.TIMER,
-            isBoosted = isBoosted
+            isActive = activeUtil == ActiveUtility.TIMER
         ) {
             Column {
                 Row(
@@ -153,7 +148,7 @@ fun UtilitiesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.HourglassTop, contentDescription = null, tint = GlyphColors.NeonRed)
+                        Icon(Icons.Default.HourglassTop, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "GLYPH TIMER",
@@ -179,7 +174,8 @@ fun UtilitiesScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (activeUtil == ActiveUtility.TIMER) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                            containerColor = if (activeUtil == ActiveUtility.TIMER) Color.White else Color(0x26FFFFFF),
+                            contentColor = if (activeUtil == ActiveUtility.TIMER) Color.Black else Color.White
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -204,13 +200,13 @@ fun UtilitiesScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSel) GlyphColors.NeonRed else Color(0x1FFFFFFF))
+                                .background(if (isSel) Color.White else Color(0x1FFFFFFF))
                                 .clickable { timerDurationSec = sec }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = label,
-                                color = if (isSel) Color.White else Color.Gray,
+                                color = if (isSel) Color.Black else Color.Gray,
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -226,8 +222,7 @@ fun UtilitiesScreen(
         // Utility 2: Battery Gauge
         LiquidGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            isActive = activeUtil == ActiveUtility.BATTERY,
-            isBoosted = isBoosted
+            isActive = activeUtil == ActiveUtility.BATTERY
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -235,7 +230,7 @@ fun UtilitiesScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = GlyphColors.NeonRed)
+                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
@@ -246,7 +241,7 @@ fun UtilitiesScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Mirrors battery % to arc LEDs",
+                            text = "Отображает уровень заряда дугами",
                             color = Color.Gray,
                             fontSize = 11.sp
                         )
@@ -267,7 +262,8 @@ fun UtilitiesScreen(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeUtil == ActiveUtility.BATTERY) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                        containerColor = if (activeUtil == ActiveUtility.BATTERY) Color.White else Color(0x26FFFFFF),
+                        contentColor = if (activeUtil == ActiveUtility.BATTERY) Color.Black else Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -285,11 +281,11 @@ fun UtilitiesScreen(
         // Utility 3: Pro Softlight & Strobe
         LiquidGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            isBoosted = isBoosted
+            isActive = activeUtil == ActiveUtility.SOFTLIGHT || activeUtil == ActiveUtility.STROBE
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.FlashlightOn, contentDescription = null, tint = GlyphColors.NeonRed)
+                    Icon(Icons.Default.FlashlightOn, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "LIGHT & STROBE",
@@ -308,7 +304,7 @@ fun UtilitiesScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("SOFTLIGHT BRIGHTNESS", color = Color.Gray, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                    Text("${(softlightBrightness / 255f * 100).toInt()}%", color = GlyphColors.NeonRed, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Text("${(softlightBrightness / 255f * 100).toInt()}%", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 }
                 Slider(
                     value = softlightBrightness.toFloat(),
@@ -324,15 +320,15 @@ fun UtilitiesScreen(
                     },
                     valueRange = 10f..255f,
                     colors = SliderDefaults.colors(
-                        thumbColor = GlyphColors.NeonRed,
-                        activeTrackColor = GlyphColors.NeonRed,
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
                         inactiveTrackColor = Color(0x33FFFFFF)
                     )
                 )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick = {
@@ -349,11 +345,13 @@ fun UtilitiesScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (activeUtil == ActiveUtility.SOFTLIGHT) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                            containerColor = if (activeUtil == ActiveUtility.SOFTLIGHT) Color.White else Color(0x26FFFFFF),
+                            contentColor = if (activeUtil == ActiveUtility.SOFTLIGHT) Color.Black else Color.White
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (activeUtil == ActiveUtility.SOFTLIGHT) "TURN OFF" else "SOFTLIGHT ON", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        Text(if (activeUtil == ActiveUtility.SOFTLIGHT) "TURN OFF" else "SOFTLIGHT", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
 
                     Button(
@@ -371,9 +369,11 @@ fun UtilitiesScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (activeUtil == ActiveUtility.STROBE) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                            containerColor = if (activeUtil == ActiveUtility.STROBE) Color.White else Color(0x26FFFFFF),
+                            contentColor = if (activeUtil == ActiveUtility.STROBE) Color.Black else Color.White
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text(if (activeUtil == ActiveUtility.STROBE) "STOP STROBE" else "STROBE ($strobeHz Hz)", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }

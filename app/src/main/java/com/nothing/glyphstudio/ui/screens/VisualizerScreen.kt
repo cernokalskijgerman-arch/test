@@ -105,17 +105,14 @@ fun VisualizerScreen(
                 )
                 Text(
                     text = if (isListening) "SPECTRUM ACTIVE (FFT)" else "IDLE",
-                    color = if (isListening) {
-                        if (isBoosted) GlyphColors.BoostPlasma else GlyphColors.NeonRed
-                    } else Color.Gray,
+                    color = if (isListening) Color.White else Color.Gray,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
             NothingBadge(
                 text = if (isListening) "FFT RUNNING" else "STANDBY",
-                isActive = isListening,
-                isBoosted = isBoosted
+                isActive = isListening
             )
         }
 
@@ -125,16 +122,14 @@ fun VisualizerScreen(
         GlyphSimulatorView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp),
-            isBoosted = isBoosted
+                .height(240.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Live Audio Spectrum Meters (Bass, Mid, Treble)
         LiquidGlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            isBoosted = isBoosted
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column {
                 Row(
@@ -149,7 +144,7 @@ fun VisualizerScreen(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
-                    NothingBadge(text = "3-WAY CAM MATRIX", isBoosted = isBoosted)
+                    NothingBadge(text = "3-WAY CAM MATRIX")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -160,9 +155,9 @@ fun VisualizerScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    SpectrumBar(name = "BASS (RIGHT 16)", level = bass, color = GlyphColors.NeonRed)
-                    SpectrumBar(name = "MIDS (TOP 12)", level = mid, color = GlyphColors.BrightRedGlow)
-                    SpectrumBar(name = "HIGHS (BOT 6)", level = treble, color = Color(0xFFFF8A94))
+                    SpectrumBar(name = "BASS (RIGHT)", level = bass, color = Color.White)
+                    SpectrumBar(name = "MIDS (TOP)", level = mid, color = Color(0xD9FFFFFF))
+                    SpectrumBar(name = "HIGHS (BOT)", level = treble, color = Color(0x99FFFFFF))
                 }
             }
         }
@@ -171,8 +166,7 @@ fun VisualizerScreen(
 
         // Controls (Source & Sensitivity)
         LiquidGlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            isBoosted = isBoosted
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column {
                 // Source Selector
@@ -191,14 +185,15 @@ fun VisualizerScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isListening) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                            containerColor = if (isListening) Color.White else Color(0x26FFFFFF),
+                            contentColor = if (isListening) Color.Black else Color.White
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
                             imageVector = if (isListening) Icons.Default.Stop else Icons.Default.GraphicEq,
                             contentDescription = "Toggle",
-                            tint = Color.White
+                            tint = if (isListening) Color.Black else Color.White
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -242,7 +237,7 @@ fun VisualizerScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("SENSITIVITY", color = Color.Gray, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                    Text("${(sensitivity * 100).toInt()}%", color = GlyphColors.NeonRed, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Text("${(sensitivity * 100).toInt()}%", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 }
 
                 Slider(
@@ -253,8 +248,8 @@ fun VisualizerScreen(
                     },
                     valueRange = 0.5f..3.0f,
                     colors = SliderDefaults.colors(
-                        thumbColor = GlyphColors.NeonRed,
-                        activeTrackColor = GlyphColors.NeonRed,
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
                         inactiveTrackColor = Color(0x33FFFFFF)
                     )
                 )
@@ -282,7 +277,7 @@ private fun SpectrumBar(
                 .width(44.dp)
                 .height(80.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0x22111116)),
+                .background(Color(0x1AFFFFFF)),
             contentAlignment = Alignment.BottomCenter
         ) {
             Box(
@@ -313,13 +308,13 @@ private fun SourceButton(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) GlyphColors.NeonRed else Color(0x22FFFFFF))
+            .background(if (isSelected) Color.White else Color(0x1FFFFFFF))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Text(
             text = title,
-            color = if (isSelected) Color.White else Color.Gray,
+            color = if (isSelected) Color.Black else Color.Gray,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold

@@ -427,16 +427,26 @@ object GlyphController {
     }
 
     fun setSinglePixel(pixelIndex: Int, brightness: Int = 255, trailFade: Boolean = true) {
-        val total = _activeDevice.value.totalSegments
-        val norm = ((pixelIndex % total) + total) % total
-        val array = IntArray(total)
-        array[norm] = brightness.coerceIn(0, 255)
+        val device = _activeDevice.value
+        val seq = getCircularSequence(device)
+        if (seq.isEmpty()) return
 
-        if (trailFade) {
-            val prev1 = ((norm - 1) % total + total) % total
-            val prev2 = ((norm - 2) % total + total) % total
-            array[prev1] = (brightness * 0.40f).toInt()
-            array[prev2] = (brightness * 0.12f).toInt()
+        val normSeqIdx = ((pixelIndex % seq.size) + seq.size) % seq.size
+        val targetChannel = seq[normSeqIdx]
+
+        val total = device.totalSegments
+        val array = IntArray(total)
+        if (targetChannel in array.indices) {
+            array[targetChannel] = brightness.coerceIn(0, 255)
+        }
+
+        if (trailFade && seq.size > 2) {
+            val prevSeqIdx1 = (normSeqIdx - 1 + seq.size) % seq.size
+            val prevSeqIdx2 = (normSeqIdx - 2 + seq.size) % seq.size
+            val ch1 = seq[prevSeqIdx1]
+            val ch2 = seq[prevSeqIdx2]
+            if (ch1 in array.indices) array[ch1] = (brightness * 0.40f).toInt()
+            if (ch2 in array.indices) array[ch2] = (brightness * 0.12f).toInt()
         }
 
         updateFrame(GlyphFrame(segmentBrightness = array))
@@ -569,10 +579,51 @@ object GlyphController {
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, // Right Arc
                 24 // Bottom-Left
             )
-            NothingDevice.PHONE_2 -> intArrayOf(
-                0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 2, 3, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
-            )
-            NothingDevice.PHONE_1 -> (0 until 16).toList().toIntArray()
+            NothingDevice.PHONE_2 -> (4..19).toList().toIntArray() // 16 discrete LEDs in the center circular ring
+            NothingDevice.PHONE_1 -> (8..15).toList().toIntArray() // 8 discrete LEDs in center circle
+        }
+    }
+
+    fun getSectorName(device: NothingDevice, channel: Int): String {
+        return when (device) {
+            NothingDevice.PHONE_3A_PRO -> when (channel) {
+                in 0..19 -> "ДУГА 1 (ВЕРХ-ЛЕВО)"
+                in 20..30 -> "ДУГА 3 (СПРАВА)"
+                in 31..35 -> "ДУГА 2 (НИЗ-ЛЕВО)"
+                else -> "КАНАЛ #$channel"
+            }
+            NothingDevice.PHONE_2A -> when (channel) {
+                25 -> "ЗОНА A (ВЕРХ-ЛЕВО)"
+                in 0..23 -> "ЗОНА C (СПРАВА)"
+                24 -> "ЗОНА B (НИЗ-ЛЕВО)"
+                else -> "КАНАЛ #$channel"
+            }
+            NothingDevice.PHONE_2 -> when (channel) {
+                in 4..19 -> "ЦЕНТРАЛЬНОЕ КОЛЬЦО #${channel - 4}"
+                else -> "ЗОНА #$channel"
+            }
+            NothingDevice.PHONE_1 -> when (channel) {
+                in 8..15 -> "ЦЕНТРАЛЬНЫЙ КРУГ #${channel - 8}"
+                else -> "ЗОНА #$channel"
+            }
+        }
+    }
+
+    fun getSectorDirection(device: NothingDevice, channel: Int): String {
+        val seq = getCircularSequence(device)
+        val idx = seq.indexOf(channel)
+        if (idx == -1) return "Указывает на игрока"
+        val total = seq.size
+        val angleDeg = (idx.toFloat() / total.toFloat()) * 360f
+        return when {
+            angleDeg in 337.5f..360f || angleDeg in 0f..22.5f -> "СЕВЕР (12:00) ⬆"
+            angleDeg in 22.5f..67.5f -> "СЕВЕРО-ВОСТОК (1:30) ↗"
+            angleDeg in 67.5f..112.5f -> "ВОСТОК (3:00) ➡"
+            angleDeg in 112.5f..157.5f -> "ЮГО-ВОСТОК (4:30) ↘"
+            angleDeg in 157.5f..202.5f -> "ЮГ (6:00) ⬇"
+            angleDeg in 202.5f..247.5f -> "ЮГО-ЗАПАД (7:30) ↙"
+            angleDeg in 247.5f..292.5f -> "ЗАПАД (9:00) ⬅"
+            else -> "СЕВЕРО-ЗАПАД (10:30) ↖"
         }
     }
 
@@ -695,16 +746,23 @@ object GlyphController {
         }
     }
 
-    fun startBottleRoulette(scope: CoroutineScope, onStop: ((Int) -> Unit)? = null) {
+    fun startBottleRoulette(
+        scope: CoroutineScope,
+        onStep: ((currentChannel: Int, delayMs: Long, step: Int, totalSteps: Int) -> Unit)? = null,
+        onStop: ((Int) -> Unit)? = null
+    ) {
         stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "BOTTLE"
         val seq = getCircularSequence(_activeDevice.value)
+        if (seq.isEmpty()) return
         log("CMD", "🍾 Старт «Световой бутылочки» (${seq.size} светодиодов, круговое вращение)")
 
         animationJob = scope.launch(Dispatchers.Default) {
             var seqIdx = Random.nextInt(seq.size)
-            val totalSteps = 45 + Random.nextInt(25)
-            var currentDelayMs = 25L
+            // 3 to 5 full revolutions + random sector offset
+            val fullRevs = 3 + Random.nextInt(3)
+            val totalSteps = fullRevs * seq.size + Random.nextInt(seq.size)
+            var currentDelayMs = 18L
 
             for (step in 0 until totalSteps) {
                 if (!isActive) break
@@ -716,20 +774,25 @@ object GlyphController {
                 val total = _activeDevice.value.totalSegments
                 val array = IntArray(total)
                 if (currentChannel in array.indices) array[currentChannel] = 255
-                if (prevChannel1 in array.indices) array[prevChannel1] = 90
-                if (prevChannel2 in array.indices) array[prevChannel2] = 25
+                if (prevChannel1 in array.indices) array[prevChannel1] = 100
+                if (prevChannel2 in array.indices) array[prevChannel2] = 30
                 updateFrame(GlyphFrame(segmentBrightness = array))
 
                 val progress = step.toFloat() / totalSteps.toFloat()
                 if (progress > 0.40f) {
                     val f = (progress - 0.40f) / 0.60f
-                    currentDelayMs = (25L + (f * f * 340L)).toLong()
+                    // Non-linear natural friction curve
+                    currentDelayMs = (18L + (f * f * f * 340L)).toLong()
                 }
+
+                onStep?.invoke(currentChannel, currentDelayMs, step, totalSteps)
                 delay(currentDelayMs)
             }
 
             val winner = seq[seqIdx]
-            log("SUCCESS", "🍾 Световая бутылочка остановилась: светодиод #$winner")
+            val sector = getSectorName(_activeDevice.value, winner)
+            val dir = getSectorDirection(_activeDevice.value, winner)
+            log("SUCCESS", "🍾 Бутылочка остановилась: LED #$winner ($sector, $dir)")
 
             // Victory pulse
             val total = _activeDevice.value.totalSegments
@@ -738,9 +801,9 @@ object GlyphController {
                 val winArray = IntArray(total)
                 if (winner in winArray.indices) winArray[winner] = 255
                 updateFrame(GlyphFrame(segmentBrightness = winArray))
-                delay(150L)
+                delay(140L)
                 updateFrame(GlyphFrame(segmentBrightness = IntArray(total)))
-                delay(120L)
+                delay(100L)
             }
             val finalArray = IntArray(total)
             if (winner in finalArray.indices) finalArray[winner] = 255

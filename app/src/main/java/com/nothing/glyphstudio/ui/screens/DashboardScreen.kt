@@ -74,17 +74,26 @@ fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "GLYPH (STUDIO)",
-                        color = GlyphColors.TextWhite,
-                        fontSize = 22.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "GLYPH (STUDIO)",
+                            color = GlyphColors.TextWhite,
+                            fontSize = 22.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(GlyphColors.NothingRed)
+                        )
+                    }
                     Text(
                         text = activeDevice.displayName.uppercase(),
-                        color = GlyphColors.NeonRed,
+                        color = GlyphColors.TextMuted,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         letterSpacing = 1.sp
@@ -96,10 +105,10 @@ fun DashboardScreen(
                     if (onNavigateTest != null) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x22FFFFFF))
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x1FFFFFFF))
                                 .clickable { onNavigateTest() }
-                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                .padding(horizontal = 9.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = "🧪 ТЕСТ",
@@ -115,8 +124,8 @@ fun DashboardScreen(
                     // Unified Status Badge (clickable to test)
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isHardwareConnected) GlyphColors.DeepRedWine else Color(0x331C080B))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isHardwareConnected) Color(0x3300FF66) else Color(0x1FFFFFFF))
                             .clickable { onNavigateTest?.invoke() }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -185,7 +194,7 @@ fun DashboardScreen(
             )
         }
 
-        // Device Switcher Bar (Monochrome + Nothing Red)
+        // Device Switcher Bar (Monochrome Liquid Glass)
         item {
             Row(
                 modifier = Modifier
@@ -199,9 +208,9 @@ fun DashboardScreen(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) GlyphColors.NeonRed else Color(0x1AFFFFFF))
+                            .background(if (isSelected) Color.White else Color(0x1FFFFFFF))
                             .clickable { GlyphController.setDevice(device) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = when (device) {
@@ -210,7 +219,7 @@ fun DashboardScreen(
                                 NothingDevice.PHONE_2 -> "PHONE (2)"
                                 NothingDevice.PHONE_1 -> "PHONE (1)"
                             },
-                            color = if (isSelected) Color.White else GlyphColors.TextMuted,
+                            color = if (isSelected) Color.Black else GlyphColors.TextMuted,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
@@ -249,7 +258,7 @@ fun DashboardScreen(
                 title = "УТИЛИТЫ И СВЕТ",
                 subtitle = "Глиф-таймер, индикатор заряда, стробоскоп & фонарик",
                 icon = Icons.Default.FlashOn,
-                tag = "FOREGROUND",
+                tag = "TOOLS",
                 onClick = { onNavigate(ScreenDestination.UTILITIES) }
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -260,7 +269,7 @@ fun DashboardScreen(
                 title = "АРКАДНЫЕ ИГРЫ",
                 subtitle = "«Световая бутылочка» (рулетка) и «Glyph Reflex»",
                 icon = Icons.Default.SportsEsports,
-                tag = "MINI-GAMES",
+                tag = "ARCADE",
                 onClick = { onNavigate(ScreenDestination.ARCADE) }
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -288,13 +297,14 @@ private fun HubCard(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(GlyphColors.DeepRedWine),
+                    .background(Color(0x26FFFFFF))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = GlyphColors.NeonRed,
+                    tint = Color.White,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -312,20 +322,7 @@ private fun HubCard(
                         letterSpacing = 0.8.sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0x33FF2E3B))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = tag,
-                            color = GlyphColors.NeonRed,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    NothingBadge(text = tag)
                 }
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(

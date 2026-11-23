@@ -67,8 +67,11 @@ fun GlyphSimulatorView(
 
             // 3. Draw Glyphs
             when (activeDevice) {
-                NothingDevice.PHONE_3A_PRO, NothingDevice.PHONE_2A -> {
+                NothingDevice.PHONE_3A_PRO -> {
                     drawPhone3aProGlyphs(w, h, currentFrame.segmentBrightness)
+                }
+                NothingDevice.PHONE_2A -> {
+                    drawPhone2aGlyphs(w, h, currentFrame.segmentBrightness)
                 }
                 NothingDevice.PHONE_2 -> {
                     drawPhone2Glyphs(w, h, currentFrame.segmentBrightness)
@@ -86,7 +89,7 @@ private fun DrawScope.drawPhoneBackplate(w: Float, h: Float) {
 
     // Frosted Minimalist AMOLED Back Plate
     drawRoundRect(
-        color = Color(0xF408080C),
+        color = Color(0xF406070A),
         size = Size(w, h),
         cornerRadius = CornerRadius(corner, corner)
     )
@@ -95,15 +98,15 @@ private fun DrawScope.drawPhoneBackplate(w: Float, h: Float) {
     drawRoundRect(
         brush = Brush.verticalGradient(
             colors = listOf(
-                Color(0x40FFFFFF),
-                Color(0x15FF2E3B),
-                Color(0x05FF2E3B),
-                Color(0x25FFFFFF)
+                Color(0x4DFFFFFF),
+                Color(0x1AFFFFFF),
+                Color(0x0AFFFFFF),
+                Color(0x26FFFFFF)
             )
         ),
         size = Size(w, h),
         cornerRadius = CornerRadius(corner, corner),
-        style = Stroke(width = 1.5.dp.toPx())
+        style = Stroke(width = 1.4.dp.toPx())
     )
 }
 
@@ -330,42 +333,118 @@ private fun DrawScope.drawPhone3aProGlyphs(w: Float, h: Float, brightness: IntAr
 }
 
 /**
- * Draws an individual discrete LED dot with realistic bloom, specular glow, and off-state bezel.
+ * Draws Nothing Phone (2a) Glyphs:
+ * - Zone A: Top-Left (1 LED, channel 25)
+ * - Zone B: Bottom-Left (1 LED, channel 24)
+ * - Zone C: Right Arc (24 LEDs, channels 0..23)
+ */
+private fun DrawScope.drawPhone2aGlyphs(w: Float, h: Float, brightness: IntArray) {
+    val cx = w * 0.5f
+    val cy = h * 0.35f
+    val cameraR = w * 0.30f
+    val glyphR = cameraR + 13.dp.toPx()
+
+    val trackCol = Color(0xFF1E212B)
+    val trackWidth = 7.dp.toPx()
+
+    // Base Curved Tracks
+    // Top-Left Arc
+    drawArc(
+        color = trackCol,
+        startAngle = 205f,
+        sweepAngle = 32f,
+        useCenter = false,
+        topLeft = Offset(cx - glyphR, cy - glyphR),
+        size = Size(glyphR * 2, glyphR * 2),
+        style = Stroke(width = trackWidth, cap = StrokeCap.Round)
+    )
+
+    // Bottom-Left Arc
+    drawArc(
+        color = trackCol,
+        startAngle = 135f,
+        sweepAngle = 22f,
+        useCenter = false,
+        topLeft = Offset(cx - glyphR, cy - glyphR),
+        size = Size(glyphR * 2, glyphR * 2),
+        style = Stroke(width = trackWidth, cap = StrokeCap.Round)
+    )
+
+    // Right Arc
+    drawArc(
+        color = trackCol,
+        startAngle = -16f,
+        sweepAngle = 48f,
+        useCenter = false,
+        topLeft = Offset(cx - glyphR, cy - glyphR),
+        size = Size(glyphR * 2, glyphR * 2),
+        style = Stroke(width = trackWidth, cap = StrokeCap.Round)
+    )
+
+    // 1. Zone A: Top-Left LED (Channel 25)
+    val aAngle = 221f * (PI / 180.0)
+    val aCenter = Offset((cx + glyphR * cos(aAngle)).toFloat(), (cy + glyphR * sin(aAngle)).toFloat())
+    val bA = if (25 < brightness.size) brightness[25] else 0
+    drawDiscreteLedDot(aCenter, bA, radius = 5.0.dp.toPx())
+
+    // 2. Zone B: Bottom-Left LED (Channel 24)
+    val bAngle = 146f * (PI / 180.0)
+    val bCenter = Offset((cx + glyphR * cos(bAngle)).toFloat(), (cy + glyphR * sin(bAngle)).toFloat())
+    val bB = if (24 < brightness.size) brightness[24] else 0
+    drawDiscreteLedDot(bCenter, bB, radius = 5.0.dp.toPx())
+
+    // 3. Zone C: Right Arc (24 LEDs, Channels 0..23)
+    val arcCount = 24
+    val arcStart = -14f
+    val arcEnd = 30f
+    val arcStep = (arcEnd - arcStart) / (arcCount - 1)
+    for (i in 0 until arcCount) {
+        val angleDeg = arcStart + i * arcStep
+        val rad = angleDeg * (PI / 180.0)
+        val ledCenter = Offset((cx + glyphR * cos(rad)).toFloat(), (cy + glyphR * sin(rad)).toFloat())
+        val b = if (i < brightness.size) brightness[i] else 0
+        drawDiscreteLedDot(ledCenter, b, radius = 3.6.dp.toPx())
+    }
+}
+
+/**
+ * Draws an individual discrete LED dot with authentic 6500K Ice-White bloom,
+ * specular glow, and dark graphite off-state bezel.
  */
 private fun DrawScope.drawDiscreteLedDot(center: Offset, brightness0to255: Int, radius: Float) {
     val alpha = (brightness0to255 / 255f).coerceIn(0f, 1f)
 
     // Base off-state LED socket
     drawCircle(
-        color = Color(0x332A2A33),
+        color = Color(0xFF161822),
         radius = radius,
         center = center
     )
     drawCircle(
-        color = Color(0x22FFFFFF),
+        color = Color(0x2EFFFFFF),
         radius = radius,
         center = center,
         style = Stroke(0.8.dp.toPx())
     )
 
-    // Active illuminated state
+    // Active illuminated state - Ice-White 6500K Nothing Hardware Glow
     if (alpha > 0.03f) {
-        // Outer soft light bloom
+        // Outer soft light bloom (cyan-tinted cold white)
         drawCircle(
-            color = Color(0xFFFF2E3B).copy(alpha = alpha * 0.45f),
-            radius = radius * 2.4f,
+            color = Color(0xFFD6EEFF).copy(alpha = alpha * 0.35f),
+            radius = radius * 2.8f,
             center = center
         )
-        // Mid neon red glow
+        // Mid brilliant white glow
         drawCircle(
-            color = Color(0xFFFF3845).copy(alpha = alpha * 0.85f),
-            radius = radius * 1.4f,
+            color = Color(0xFFFFFFFF).copy(alpha = alpha * 0.80f),
+            radius = radius * 1.5f,
             center = center
         )
-        // Intense bright core
+        // Intense bright white core
         drawCircle(
-            color = Color(0xFFFF858E).copy(alpha = alpha),
-            radius = radius * 0.7f,
+            color = Color(0xFFFFFFFF).copy(alpha = alpha),
+            radius = radius * 0.8f,
             center = center
         )
     }
@@ -377,9 +456,10 @@ private fun DrawScope.drawPhone2Glyphs(w: Float, h: Float, brightness: IntArray)
     val r = w * 0.32f
     val segAngle = 360f / 16f
     for (i in 0 until 16) {
-        val b = if (i < brightness.size) brightness[i] / 255f else 0f
+        val ch = 4 + i // Center ring channels 4..19
+        val b = if (ch < brightness.size) brightness[ch] / 255f else 0f
         drawArc(
-            color = if (b > 0.05f) Color(0xFFFF2E3B).copy(alpha = b) else Color(0x33333333),
+            color = if (b > 0.05f) Color.White.copy(alpha = b) else Color(0x22FFFFFF),
             startAngle = i * segAngle,
             sweepAngle = segAngle - 3f,
             useCenter = false,
@@ -396,7 +476,7 @@ private fun DrawScope.drawPhone1Glyphs(w: Float, h: Float, brightness: IntArray)
     val r = w * 0.33f
     val b0 = if (brightness.isNotEmpty()) brightness[0] / 255f else 0f
     drawArc(
-        color = if (b0 > 0.05f) Color(0xFFFF2E3B).copy(alpha = b0) else Color(0x33333333),
+        color = if (b0 > 0.05f) Color.White.copy(alpha = b0) else Color(0x22FFFFFF),
         startAngle = 30f,
         sweepAngle = 300f,
         useCenter = false,
@@ -405,3 +485,4 @@ private fun DrawScope.drawPhone1Glyphs(w: Float, h: Float, brightness: IntArray)
         style = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round)
     )
 }
+

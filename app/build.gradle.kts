@@ -84,6 +84,7 @@ dependencies {
     // Official Nothing Glyph Developer Kit SDK 2.0 (classes for Nothing Ketchum & IGlyphService)
     implementation(files("libs/glyph-matrix-sdk-2.0.jar"))
 
+    testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

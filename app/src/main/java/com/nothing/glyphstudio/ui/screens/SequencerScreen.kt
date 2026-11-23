@@ -145,7 +145,7 @@ fun SequencerScreen(
                 )
                 Text(
                     text = sequenceName,
-                    color = GlyphColors.NeonRed,
+                    color = GlyphColors.TextMuted,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace
                 )
@@ -158,7 +158,7 @@ fun SequencerScreen(
                 bpm = p.bpm
                 Toast.makeText(context, "Loaded: ${p.name}", Toast.LENGTH_SHORT).show()
             }) {
-                Icon(Icons.Default.FolderOpen, contentDescription = "Preset", tint = GlyphColors.TextWhite)
+                Icon(Icons.Default.FolderOpen, contentDescription = "Preset", tint = Color.White)
             }
 
             IconButton(onClick = {
@@ -174,7 +174,7 @@ fun SequencerScreen(
                 PresetRepository.saveToFile(context, seq, sequenceName)
                 Toast.makeText(context, "Saved: $sequenceName.glyph", Toast.LENGTH_SHORT).show()
             }) {
-                Icon(Icons.Default.Save, contentDescription = "Save", tint = GlyphColors.NeonRed)
+                Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.White)
             }
         }
 
@@ -200,14 +200,15 @@ fun SequencerScreen(
                     Button(
                         onClick = { isPlaying = !isPlaying },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isPlaying) GlyphColors.NeonRed else Color(0x33FF2E3B)
+                            containerColor = if (isPlaying) Color.White else Color(0x26FFFFFF),
+                            contentColor = if (isPlaying) Color.Black else Color.White
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Stop" else "Play",
-                            tint = Color.White
+                            tint = if (isPlaying) Color.Black else Color.White
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -243,8 +244,8 @@ fun SequencerScreen(
                     onValueChange = { bpm = it.toInt() },
                     valueRange = 60f..220f,
                     colors = SliderDefaults.colors(
-                        thumbColor = GlyphColors.NeonRed,
-                        activeTrackColor = GlyphColors.NeonRed,
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
                         inactiveTrackColor = Color(0x22FFFFFF)
                     )
                 )
@@ -269,12 +270,12 @@ fun SequencerScreen(
                                 .size(34.dp)
                                 .padding(2.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isHead) GlyphColors.NeonRed else Color(0x15FFFFFF)),
+                                .background(if (isHead) Color.White else Color(0x15FFFFFF)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "${step + 1}",
-                                color = if (isHead) Color.White else GlyphColors.TextDim,
+                                color = if (isHead) Color.Black else GlyphColors.TextDim,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -334,15 +335,15 @@ private fun SequencerRow(
                     .clip(RoundedCornerShape(6.dp))
                     .background(
                         when {
-                            isOn && isHead -> Color(0xFFFF6975)
-                            isOn -> GlyphColors.NeonRed
-                            isHead -> Color(0x33FF2E3B)
-                            else -> Color(0x22111116)
+                            isOn && isHead -> Color.White
+                            isOn -> Color(0xE6FFFFFF)
+                            isHead -> Color(0x33FFFFFF)
+                            else -> Color(0x1A141724)
                         }
                     )
                     .border(
                         width = 1.dp,
-                        color = if (isOn) GlyphColors.NeonRed else Color(0x22FFFFFF),
+                        color = if (isOn) Color.White else Color(0x22FFFFFF),
                         shape = RoundedCornerShape(6.dp)
                     )
                     .clickable { onStepToggle(i) }

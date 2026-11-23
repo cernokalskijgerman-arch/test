@@ -1,6 +1,16 @@
 package com.nothing.glyphstudio.ui.screens
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.view.SoundEffectConstants
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +34,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -31,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -41,23 +53,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nothing.glyphstudio.glyph.GlyphController
+import com.nothing.glyphstudio.glyph.GlyphFrame
 import com.nothing.glyphstudio.theme.GlyphColors
 import com.nothing.glyphstudio.ui.components.GlyphSimulatorView
 import com.nothing.glyphstudio.ui.components.LiquidGlassCard
+import com.nothing.glyphstudio.ui.components.NothingBadge
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-
-import com.nothing.glyphstudio.ui.components.NothingBadge
 
 enum class ArcadeGameMode {
     SPIN_THE_BOTTLE,
@@ -77,11 +91,13 @@ fun ArcadeScreen(
     isBoosted: Boolean = false,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     var selectedGame by remember { mutableStateOf(ArcadeGameMode.SPIN_THE_BOTTLE) }
+    val activeDevice by GlyphController.activeDevice.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
-            GlyphController.clear()
+            GlyphController.stopAllAnimations(resetFrame = true)
         }
     }
 
@@ -89,7 +105,7 @@ fun ArcadeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(GlyphColors.AmoledBlack)
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
         // Top Bar
@@ -98,202 +114,378 @@ fun ArcadeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = {
-                GlyphController.clear()
+                GlyphController.stopAllAnimations(resetFrame = true)
                 onBack()
             }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Назад", tint = Color.White)
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "GLYPH ARCADE",
                     color = GlyphColors.TextWhite,
                     fontSize = 18.sp,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
                 )
                 Text(
-                    text = "34 LED HARDWARE MINI-GAMES",
-                    color = if (isBoosted) GlyphColors.BoostPlasma else GlyphColors.NeonRed,
-                    fontSize = 11.sp,
+                    text = "PHYSICAL HARDWARE GAMES • ${activeDevice.displayName.uppercase()}",
+                    color = GlyphColors.TextMuted,
+                    fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
             NothingBadge(
                 text = if (selectedGame == ArcadeGameMode.SPIN_THE_BOTTLE) "ROULETTE" else "REFLEX",
-                isActive = true,
-                isBoosted = isBoosted
+                isActive = true
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Game Mode Tab Switcher
+        // Game Mode Tab Switcher in Liquid Glass
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
             GameTabPill(
                 title = "БУТЫЛОЧКА / РУЛЕТКА",
-                isSelected = selectedGame == ArcadeGameMode.SPIN_THE_BOTTLE,
-                isBoosted = isBoosted
+                isSelected = selectedGame == ArcadeGameMode.SPIN_THE_BOTTLE
             ) {
-                GlyphController.clear()
+                GlyphController.stopAllAnimations(resetFrame = true)
                 selectedGame = ArcadeGameMode.SPIN_THE_BOTTLE
             }
             Spacer(modifier = Modifier.width(8.dp))
             GameTabPill(
                 title = "GLYPH REFLEX",
-                isSelected = selectedGame == ArcadeGameMode.REFLEX_TEST,
-                isBoosted = isBoosted
+                isSelected = selectedGame == ArcadeGameMode.REFLEX_TEST
             ) {
-                GlyphController.clear()
+                GlyphController.stopAllAnimations(resetFrame = true)
                 selectedGame = ArcadeGameMode.REFLEX_TEST
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Simulator
+        // Live 2D Simulator (Ice-White LEDs)
         GlyphSimulatorView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(210.dp),
-            isBoosted = isBoosted
+                .height(200.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Selected Game View
         when (selectedGame) {
-            ArcadeGameMode.SPIN_THE_BOTTLE -> SpinTheBottleGame(isBoosted = isBoosted)
-            ArcadeGameMode.REFLEX_TEST -> ReflexGame(isBoosted = isBoosted)
+            ArcadeGameMode.SPIN_THE_BOTTLE -> SpinTheBottleGame()
+            ArcadeGameMode.REFLEX_TEST -> ReflexGame()
         }
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
 /**
- * Game 1: Glyph Spin the Bottle / Roulette (Световая бутылочка).
- * One single LED pixel spins around all glyph segments with physics deceleration friction.
+ * Game 1: "Световая бутылочка" (Spin the bottle / Hardware Glyph Roulette).
+ * Features authentic physics friction deceleration, synchronized LED tracking around the camera,
+ * tactile haptic and audio clicking on each step, and directional sector winner detection.
  */
 @Composable
-private fun SpinTheBottleGame(isBoosted: Boolean = false) {
+private fun SpinTheBottleGame() {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var spinJob by remember { mutableStateOf<Job?>(null) }
+    val activeDevice by GlyphController.activeDevice.collectAsState()
+
     var isSpinning by remember { mutableStateOf(false) }
-    var winnerSegment by remember { mutableIntStateOf(-1) }
-    var statusText by remember { mutableStateOf("Нажмите «КРУТИТЬ», чтобы запустить световой пиксель") }
+    var currentSector by remember { mutableStateOf("") }
+    var currentDirection by remember { mutableStateOf("") }
+    var currentChannel by remember { mutableIntStateOf(-1) }
+    var winnerChannel by remember { mutableIntStateOf(-1) }
+    var winnerSector by remember { mutableStateOf("") }
+    var winnerDirection by remember { mutableStateOf("") }
+    var spinCount by remember { mutableIntStateOf(0) }
+    var isTurboSpeed by remember { mutableStateOf(false) }
+
+    // Haptics & Audio Feedback
+    val vibrator = remember {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    val audioManager = remember {
+        try {
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    fun playStepTick(delayMs: Long) {
+        // Ticking audio click
+        try {
+            audioManager?.playSoundEffect(SoundEffectConstants.CLICK, 0.6f)
+        } catch (ignored: Throwable) {}
+
+        // Tactile vibration
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(6)
+            }
+        } catch (ignored: Throwable) {}
+    }
+
+    fun playVictoryBurst() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val timings = longArrayOf(0, 100, 60, 100, 60, 220)
+                val amplitudes = intArrayOf(0, 200, 0, 220, 0, 255)
+                vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(300)
+            }
+        } catch (ignored: Throwable) {}
+    }
 
     fun startSpin() {
         if (isSpinning) return
         isSpinning = true
-        winnerSegment = -1
-        statusText = "Пиксель вращается... Замедление!"
+        winnerChannel = -1
+        winnerSector = ""
+        winnerDirection = ""
+        spinCount++
 
-        spinJob?.cancel()
-        spinJob = coroutineScope.launch {
-            val totalSegments = GlyphController.activeDevice.value.totalSegments
-            var currentPos = Random.nextInt(totalSegments)
+        val seq = GlyphController.getCircularSequence(activeDevice)
+        if (seq.isEmpty()) return
 
-            // Random initial rotation duration & step count
-            val totalSteps = 45 + Random.nextInt(25)
-            var currentDelayMs = 25L // initial high speed
+        GlyphController.startBottleRoulette(
+            scope = coroutineScope,
+            onStep = { ch, delayMs, step, totalSteps ->
+                currentChannel = ch
+                currentSector = GlyphController.getSectorName(activeDevice, ch)
+                currentDirection = GlyphController.getSectorDirection(activeDevice, ch)
 
-            for (step in 0 until totalSteps) {
-                currentPos = (currentPos + 1) % totalSegments
-                GlyphController.setSinglePixel(currentPos, brightness = 255, trailFade = true)
-
-                // Physics friction / deceleration: delay grows gradually
-                val progress = step.toFloat() / totalSteps.toFloat()
-                if (progress > 0.5f) {
-                    currentDelayMs = (25L + (progress * progress * 320L)).toLong()
+                // Only tick audibly when decelerating or at distinct intervals
+                if (delayMs > 30L || step % 2 == 0) {
+                    playStepTick(delayMs)
                 }
-
-                delay(currentDelayMs)
+            },
+            onStop = { winner ->
+                winnerChannel = winner
+                winnerSector = GlyphController.getSectorName(activeDevice, winner)
+                winnerDirection = GlyphController.getSectorDirection(activeDevice, winner)
+                isSpinning = false
+                playVictoryBurst()
             }
+        )
+    }
 
-            // Landed!
-            winnerSegment = currentPos
-            isSpinning = false
-            statusText = "Остановка! Сегмент #$winnerSegment"
-
-            // Victory pulse on the winning segment
-            for (p in 0 until 4) {
-                GlyphController.setSinglePixel(winnerSegment, brightness = 255, trailFade = false)
-                delay(160)
-                GlyphController.clear()
-                delay(120)
-            }
-            GlyphController.setSinglePixel(winnerSegment, brightness = 255, trailFade = false)
-        }
+    fun stopSpin() {
+        GlyphController.stopBottleRoulette()
+        isSpinning = false
     }
 
     LiquidGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        isBoosted = isBoosted
+        isActive = isSpinning || winnerChannel >= 0
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "СВЕТОВАЯ БУТЫЛОЧКА",
-                color = GlyphColors.TextWhite,
-                fontSize = 16.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Один световой пиксель вращается по кругу всех глифов и постепенно останавливается по законам физики трения, указывая на игрока.",
-                color = GlyphColors.TextMuted,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Big Spin Action Button
-            Button(
-                onClick = { startSpin() },
-                enabled = !isSpinning,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GlyphColors.NeonRed,
-                    disabledContainerColor = Color(0x33FF2E3B)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth(0.75f)
-                    .height(52.dp)
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isSpinning) "ВРАЩЕНИЕ..." else "КРУТИТЬ БУТЫЛОЧКУ",
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
+                Column {
+                    Text(
+                        text = "СВЕТОВАЯ БУТЫЛОЧКА",
+                        color = GlyphColors.TextWhite,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Круговое аппаратное вращение светового луча",
+                        color = GlyphColors.TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+
+                NothingBadge(
+                    text = if (isSpinning) "ВРАЩЕНИЕ" else if (winnerChannel >= 0) "СТОП" else "ГОТОВО",
+                    isActive = isSpinning || winnerChannel >= 0
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Status Badge
+            // Main Interactive Live Display
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x331A080A))
-                    .border(1.dp, Color(0x33FF2E3B), RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0x800B0D14))
+                    .border(1.dp, if (winnerChannel >= 0) Color(0xB3FFFFFF) else Color(0x2EFFFFFF), RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
             ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    when {
+                        isSpinning -> {
+                            Text(
+                                text = "ЛУЧ ВРАЩАЕТСЯ...",
+                                color = GlyphColors.TextWhite,
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "LED #$currentChannel • $currentSector",
+                                color = Color(0xFFD5EEFF),
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = currentDirection,
+                                color = GlyphColors.TextMuted,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        winnerChannel >= 0 -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "ВЫБРАН ИГРОК!",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = winnerSector,
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Указывает: $winnerDirection (LED #$winnerChannel)",
+                                color = Color(0xFFD5EEFF),
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = "ПОЛОЖИТЕ СМАРТФОН В ЦЕНТР СТОЛА",
+                                color = GlyphColors.TextWhite,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Нажмите «КРУТИТЬ», чтобы запустить световой луч по кругу спинки",
+                                color = GlyphColors.TextMuted,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action Buttons Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Primary Spin Button
+                Button(
+                    onClick = { startSpin() },
+                    enabled = !isSpinning,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color(0x33FFFFFF),
+                        disabledContentColor = Color(0x66FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSpinning) "ВРАЩАЕТСЯ..." else "КРУТИТЬ БУТЫЛОЧКУ",
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Stop Button (visible while spinning)
+                if (isSpinning) {
+                    Button(
+                        onClick = { stopSpin() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0x26FFFFFF),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.height(50.dp)
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = "Стоп", modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            if (spinCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = statusText,
-                    color = if (winnerSegment >= 0) GlyphColors.NeonRed else GlyphColors.TextWhite,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold
+                    text = "РАУНД #$spinCount • ГЛИФЫ ПОДТВЕРЖДЕНЫ",
+                    color = GlyphColors.TextDim,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
@@ -302,9 +494,10 @@ private fun SpinTheBottleGame(isBoosted: Boolean = false) {
 
 /**
  * Game 2: Glyph Reflex (Reaction time test with millisecond precision).
+ * Minimalist Black-and-White Liquid Glass with full hardware flash.
  */
 @Composable
-private fun ReflexGame(isBoosted: Boolean = false) {
+private fun ReflexGame() {
     val coroutineScope = rememberCoroutineScope()
     var reflexState by remember { mutableStateOf(ReflexState.READY) }
     var flashStartTime by remember { mutableLongStateOf(0L) }
@@ -318,11 +511,11 @@ private fun ReflexGame(isBoosted: Boolean = false) {
 
         waitJob?.cancel()
         waitJob = coroutineScope.launch {
-            // Random wait between 1.5 and 4.2 seconds
-            val delayMs = 1500L + Random.nextLong(2700L)
+            // Random wait between 1.6 and 4.0 seconds
+            val delayMs = 1600L + Random.nextLong(2400L)
             delay(delayMs)
 
-            // Flash Glyphs + Screen!
+            // Flash Glyphs + Screen simultaneously!
             flashStartTime = System.currentTimeMillis()
             reflexState = ReflexState.FLASH_NOW
             GlyphController.setAll(255)
@@ -360,22 +553,31 @@ private fun ReflexGame(isBoosted: Boolean = false) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onUserTap() },
-        isActive = reflexState == ReflexState.FLASH_NOW,
-        isBoosted = isBoosted
+        isActive = reflexState == ReflexState.FLASH_NOW
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "GLYPH REFLEX TEST",
-                color = GlyphColors.TextWhite,
-                fontSize = 16.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "GLYPH REFLEX TEST",
+                    color = GlyphColors.TextWhite,
+                    fontSize = 15.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                if (bestTimeMs > 0L) {
+                    NothingBadge(text = "РЕКОРД: $bestTimeMs МС", isActive = true)
+                }
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Big Interactive Touch Box
             Box(
@@ -385,16 +587,16 @@ private fun ReflexGame(isBoosted: Boolean = false) {
                     .clip(RoundedCornerShape(16.dp))
                     .background(
                         when (reflexState) {
-                            ReflexState.READY -> Color(0x22111116)
-                            ReflexState.WAITING_RANDOM -> Color(0xFF140507)
-                            ReflexState.FLASH_NOW -> GlyphColors.NeonRed
-                            ReflexState.RESULT -> Color(0x33FF2E3B)
-                            ReflexState.TOO_EARLY -> Color(0x33440000)
+                            ReflexState.READY -> Color(0x6610131E)
+                            ReflexState.WAITING_RANDOM -> Color(0x990A0B10)
+                            ReflexState.FLASH_NOW -> Color.White
+                            ReflexState.RESULT -> Color(0x4D1B2233)
+                            ReflexState.TOO_EARLY -> Color(0x4D2A1215)
                         }
                     )
                     .border(
-                        2.dp,
-                        if (reflexState == ReflexState.FLASH_NOW) Color.White else Color(0x44FF2E3B),
+                        1.5.dp,
+                        if (reflexState == ReflexState.FLASH_NOW) Color.White else Color(0x33FFFFFF),
                         RoundedCornerShape(16.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -408,40 +610,36 @@ private fun ReflexGame(isBoosted: Boolean = false) {
                             ReflexState.RESULT -> "$reactionTimeMs МС"
                             ReflexState.TOO_EARLY -> "СЛИШКОМ РАНО!"
                         },
-                        color = Color.White,
-                        fontSize = if (reflexState == ReflexState.RESULT) 32.sp else 16.sp,
+                        color = if (reflexState == ReflexState.FLASH_NOW) Color.Black else Color.White,
+                        fontSize = if (reflexState == ReflexState.RESULT) 32.sp else 15.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
 
                     if (reflexState == ReflexState.RESULT) {
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = when {
-                                reactionTimeMs < 200 -> "Ранг: Кибер-Ниндзя!"
+                                reactionTimeMs < 200 -> "Ранг: Кибер-Ниндзя (Невероятно!)"
                                 reactionTimeMs < 260 -> "Ранг: Отличная реакция"
-                                reactionTimeMs < 340 -> "Ранг: Нормально"
-                                else -> "Ранг: Сонная муха :)"
+                                reactionTimeMs < 340 -> "Ранг: Хорошо"
+                                else -> "Ранг: Спокойный темп"
                             },
-                            color = GlyphColors.BrightRedGlow,
-                            fontSize = 12.sp,
+                            color = Color(0xFFD5EEFF),
+                            fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Best Score
-            if (bestTimeMs > 0L) {
-                Text(
-                    text = "ЛУЧШИЙ РЕКОРД: $bestTimeMs МС",
-                    color = GlyphColors.NeonRed,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Коснитесь экрана в любой момент для повторного старта",
+                color = GlyphColors.TextDim,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }
@@ -450,18 +648,13 @@ private fun ReflexGame(isBoosted: Boolean = false) {
 private fun GameTabPill(
     title: String,
     isSelected: Boolean,
-    isBoosted: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (isSelected) {
-                    if (isBoosted) GlyphColors.BoostPlasma else GlyphColors.NeonRed
-                } else {
-                    Color(0x1F222530)
-                }
+                if (isSelected) Color.White else Color(0x1F222530)
             )
             .border(
                 1.dp,
@@ -473,7 +666,7 @@ private fun GameTabPill(
     ) {
         Text(
             text = title,
-            color = if (isSelected) Color.White else Color.Gray,
+            color = if (isSelected) Color.Black else Color.Gray,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold
