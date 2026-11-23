@@ -190,4 +190,50 @@ class GlyphControllerTest {
         assertEquals("Total channels across 3 zones must equal 36", 36, allChannels.size)
         assertEquals("All channels must be unique from 0 to 35", (0..35).toList(), allChannels.sorted())
     }
+
+    @Test
+    fun testClosestChannelAllDevicesCardinalDirections() {
+        val angles = listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f)
+        for (device in NothingDevice.values()) {
+            val seq = GlyphController.getCircularSequence(device)
+            for (angle in angles) {
+                val ch = GlyphController.getClosestChannelForAngle(device, angle)
+                assertTrue("Resolved channel $ch must be within circular sequence for ${device.displayName}", ch in seq)
+                assertTrue("Resolved channel $ch must be within total segments bounds [0..${device.totalSegments})", ch in 0 until device.totalSegments)
+                val physAngle = GlyphController.getLedPhysicalAngle(device, ch)
+                assertTrue("Resolved channel $ch must have valid physical angle on ${device.displayName} (got $physAngle)", physAngle >= 0f)
+            }
+        }
+    }
+
+    @Test
+    fun testSetSingleChannelAndPreviewAngle() {
+        GlyphController.setDevice(NothingDevice.PHONE_2A)
+        GlyphController.setSingleChannel(25, 255)
+        val frame25 = GlyphController.currentFrame.value
+        assertEquals("Channel 25 brightness must be 255", 255, frame25.segmentBrightness[25])
+        assertEquals("Other channels must be 0", 0, frame25.segmentBrightness[0])
+
+        val chNW = GlyphController.previewAngle(315f, 200)
+        assertEquals("Preview 315° on Phone 2a must select channel 25", 25, chNW)
+        val framePreview = GlyphController.currentFrame.value
+        assertEquals("Channel 25 must be set to 200", 200, framePreview.segmentBrightness[25])
+    }
+
+    @Test
+    fun testTargetedRouletteFormulaAllDevices() {
+        for (device in NothingDevice.values()) {
+            val seq = GlyphController.getCircularSequence(device)
+            for (startIdx in seq.indices) {
+                for (targetIdx in seq.indices) {
+                    val fullRevs = 3
+                    val stepsToTarget = ((targetIdx - startIdx) % seq.size + seq.size) % seq.size
+                    val totalSteps = fullRevs * seq.size + stepsToTarget
+                    val finalIdx = (startIdx + totalSteps) % seq.size
+                    assertEquals("Final index must match target index on ${device.displayName}", targetIdx, finalIdx)
+                    assertEquals("Target channel must match", seq[targetIdx], seq[finalIdx])
+                }
+            }
+        }
+    }
 }

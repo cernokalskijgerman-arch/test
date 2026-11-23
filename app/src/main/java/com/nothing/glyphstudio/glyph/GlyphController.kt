@@ -329,6 +329,16 @@ object GlyphController {
         init(context)
     }
 
+    fun closeSession() {
+        log("INFO", "Закрытие Glyph сессии...")
+        try {
+            glyphManager?.turnOff()
+            glyphManager?.closeSession()
+        } catch (e: Throwable) {
+            log("WARN", "closeSession: ${e.message}")
+        }
+    }
+
     /**
      * Scales standard 8-bit UI brightness (0..255) to Nothing Ketchum hardware 12-bit channel brightness (0..4095).
      * In Nothing Ketchum SDK:
@@ -443,6 +453,20 @@ object GlyphController {
         log("CMD", "Одиночный канал #$channelIndex (яркость $brightness)")
     }
 
+    /**
+     * Previews and illuminates the LED closest to the specified clock angle on the active device.
+     * Returns the illuminated channel index.
+     */
+    fun previewAngle(targetClockAngle: Float, brightness: Int = 255): Int {
+        val device = _activeDevice.value
+        val ch = getClosestChannelForAngle(device, targetClockAngle)
+        setSingleChannel(ch, brightness)
+        return ch
+    }
+
+    /**
+     * Illuminates a single LED by its index along the circular sequence (0 until seq.size).
+     */
     fun setSinglePixel(pixelIndex: Int, brightness: Int = 255, trailFade: Boolean = true) {
         val device = _activeDevice.value
         val seq = getCircularSequence(device)
@@ -839,6 +863,7 @@ object GlyphController {
     fun startBottleRoulette(
         scope: CoroutineScope,
         targetChannel: Int? = null,
+        onLanded: ((winner: Int) -> Unit)? = null,
         onStop: ((winner: Int) -> Unit)? = null,
         onStep: ((currentChannel: Int, delayMs: Long, step: Int, totalSteps: Int) -> Unit)? = null
     ) {
@@ -893,7 +918,10 @@ object GlyphController {
             val dir = getSectorDirection(_activeDevice.value, winner)
             log("SUCCESS", "🍾 Бутылочка остановилась: LED #$winner ($sector, $dir)")
 
-            // Victory pulse
+            // Notify UI and trigger victory burst sounds/haptics immediately upon landing
+            onLanded?.invoke(winner)
+
+            // Victory celebratory pulse (4 synchronized flashes)
             val total = _activeDevice.value.totalSegments
             for (i in 0 until 4) {
                 if (!isActive) break

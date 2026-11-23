@@ -108,6 +108,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        com.nothing.glyphstudio.glyph.GlyphController.stopAllAnimations(resetFrame = true)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        com.nothing.glyphstudio.glyph.GlyphController.stopAllAnimations(resetFrame = true)
+        com.nothing.glyphstudio.glyph.GlyphController.closeSession()
+    }
+
     private fun checkAppPermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -308,6 +308,15 @@ private fun SpinTheBottleGame() {
         GlyphController.startBottleRoulette(
             scope = coroutineScope,
             targetChannel = targetCh,
+            onLanded = { winner ->
+                winnerChannel = winner
+                winnerSector = GlyphController.getSectorName(activeDevice, winner)
+                winnerDirection = GlyphController.getSectorDirection(activeDevice, winner)
+                playVictoryBurst()
+            },
+            onStop = { winner ->
+                isSpinning = false
+            },
             onStep = { ch, delayMs, step, totalSteps ->
                 currentChannel = ch
                 currentSector = GlyphController.getSectorName(activeDevice, ch)
@@ -317,13 +326,6 @@ private fun SpinTheBottleGame() {
                 if (delayMs > 30L || step % 2 == 0) {
                     playStepTick(delayMs)
                 }
-            },
-            onStop = { winner ->
-                winnerChannel = winner
-                winnerSector = GlyphController.getSectorName(activeDevice, winner)
-                winnerDirection = GlyphController.getSectorDirection(activeDevice, winner)
-                isSpinning = false
-                playVictoryBurst()
             }
         )
     }
@@ -442,6 +444,51 @@ private fun SpinTheBottleGame() {
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
+                        isTargetMode -> {
+                            val targetCh = GlyphController.getClosestChannelForAngle(activeDevice, targetClockAngle)
+                            val targetSector = GlyphController.getSectorName(activeDevice, targetCh)
+                            val targetDir = GlyphController.getSectorDirection(activeDevice, targetCh)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFD5EEFF))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "ЦЕЛЕВОЙ СЕКТОР ЗАДАН",
+                                    color = Color(0xFFD5EEFF),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = targetSector,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Направление: $targetDir (LED #$targetCh)",
+                                color = Color(0xFFD5EEFF),
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Нажмите «КРУТИТЬ БУТЫЛОЧКУ» для запуска рулетки",
+                                color = GlyphColors.TextMuted,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                         else -> {
                             Text(
                                 text = "ПОЛОЖИТЕ СМАРТФОН В ЦЕНТР СТОЛА",
@@ -473,7 +520,10 @@ private fun SpinTheBottleGame() {
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (!isTargetMode) Color.White else Color(0x1FFFFFFF))
-                        .clickable(enabled = !isSpinning) { isTargetMode = false }
+                        .clickable(enabled = !isSpinning) {
+                            isTargetMode = false
+                            GlyphController.clear()
+                        }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -489,7 +539,10 @@ private fun SpinTheBottleGame() {
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isTargetMode) Color.White else Color(0x1FFFFFFF))
-                        .clickable(enabled = !isSpinning) { isTargetMode = true }
+                        .clickable(enabled = !isSpinning) {
+                            isTargetMode = true
+                            GlyphController.previewAngle(targetClockAngle, 255)
+                        }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -533,8 +586,7 @@ private fun SpinTheBottleGame() {
                                     .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                                     .clickable(enabled = !isSpinning) {
                                         targetClockAngle = angle
-                                        val previewCh = GlyphController.getClosestChannelForAngle(activeDevice, angle)
-                                        GlyphController.setSinglePixel(previewCh, 255, trailFade = false)
+                                        GlyphController.previewAngle(angle, 255)
                                     }
                                     .padding(vertical = 6.dp),
                                 contentAlignment = Alignment.Center
@@ -564,8 +616,7 @@ private fun SpinTheBottleGame() {
                                     .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
                                     .clickable(enabled = !isSpinning) {
                                         targetClockAngle = angle
-                                        val previewCh = GlyphController.getClosestChannelForAngle(activeDevice, angle)
-                                        GlyphController.setSinglePixel(previewCh, 255, trailFade = false)
+                                        GlyphController.previewAngle(angle, 255)
                                     }
                                     .padding(vertical = 6.dp),
                                 contentAlignment = Alignment.Center
