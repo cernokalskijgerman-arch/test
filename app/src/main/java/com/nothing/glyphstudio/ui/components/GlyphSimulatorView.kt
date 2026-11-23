@@ -62,21 +62,22 @@ fun GlyphSimulatorView(
             // 1. Phone Body with Industrial Nothing Transparent Back
             drawPhoneBackplate(w, h)
 
-            // 2. Large Circular Camera Module (Original Nothing 3a Pro / 3 Silhouette)
-            drawCircularCameraSilhouette(w, h)
-
-            // 3. Draw Glyphs
+            // 2. Device-specific Hardware Architecture & Glyph LEDs
             when (activeDevice) {
                 NothingDevice.PHONE_3A_PRO -> {
+                    drawCircularCameraSilhouette(w, h)
                     drawPhone3aProGlyphs(w, h, currentFrame.segmentBrightness)
                 }
                 NothingDevice.PHONE_2A -> {
+                    drawPhone2aCameraSilhouette(w, h)
                     drawPhone2aGlyphs(w, h, currentFrame.segmentBrightness)
                 }
                 NothingDevice.PHONE_2 -> {
+                    drawPhone2Silhouette(w, h)
                     drawPhone2Glyphs(w, h, currentFrame.segmentBrightness)
                 }
                 NothingDevice.PHONE_1 -> {
+                    drawPhone1Silhouette(w, h)
                     drawPhone1Glyphs(w, h, currentFrame.segmentBrightness)
                 }
             }
@@ -219,6 +220,120 @@ private fun DrawScope.drawCircularCameraSilhouette(w: Float, h: Float) {
         cornerRadius = CornerRadius(pLensCorner, pLensCorner),
         style = Stroke(width = strokeWidth)
     )
+}
+
+/**
+ * Authentic Nothing Phone (2a) Horizontal "Eyes" Camera Module with Circular Base.
+ */
+private fun DrawScope.drawPhone2aCameraSilhouette(w: Float, h: Float) {
+    val cx = w * 0.5f
+    val cy = h * 0.35f
+    val r = w * 0.30f
+    val strokeCol = Color(0xFF33333C)
+    val strokeWidth = 1.6.dp.toPx()
+
+    // 1. Dark circular base
+    drawCircle(color = Color(0xFF040406), radius = r, center = Offset(cx, cy))
+    drawCircle(color = strokeCol, radius = r, center = Offset(cx, cy), style = Stroke(width = strokeWidth))
+
+    // 2. Horizontal "Eyes" Pill Housing (holding two symmetric lenses)
+    val pillW = r * 1.08f
+    val pillH = r * 0.54f
+    val pillCorner = pillH / 2f
+    drawRoundRect(
+        color = Color(0xFF0C0E14),
+        topLeft = Offset(cx - pillW / 2f, cy - pillH / 2f),
+        size = Size(pillW, pillH),
+        cornerRadius = CornerRadius(pillCorner, pillCorner)
+    )
+    drawRoundRect(
+        color = strokeCol,
+        topLeft = Offset(cx - pillW / 2f, cy - pillH / 2f),
+        size = Size(pillW, pillH),
+        cornerRadius = CornerRadius(pillCorner, pillCorner),
+        style = Stroke(width = strokeWidth)
+    )
+
+    // Left Camera Lens ("Left Eye")
+    val l1Center = Offset(cx - pillW * 0.24f, cy)
+    val lR = r * 0.16f
+    drawCircle(color = Color(0xFF141720), radius = lR, center = l1Center)
+    drawCircle(color = strokeCol, radius = lR, center = l1Center, style = Stroke(width = strokeWidth))
+    drawCircle(color = Color(0xFF060709), radius = lR * 0.55f, center = l1Center)
+
+    // Right Camera Lens ("Right Eye")
+    val l2Center = Offset(cx + pillW * 0.24f, cy)
+    drawCircle(color = Color(0xFF141720), radius = lR, center = l2Center)
+    drawCircle(color = strokeCol, radius = lR, center = l2Center, style = Stroke(width = strokeWidth))
+    drawCircle(color = Color(0xFF060709), radius = lR * 0.55f, center = l2Center)
+
+    // Iconic Nothing Red Hallmark Dot
+    drawRect(
+        color = GlyphColors.NothingRed,
+        topLeft = Offset(cx - 2.dp.toPx(), cy + r * 0.65f),
+        size = Size(4.dp.toPx(), 4.dp.toPx())
+    )
+}
+
+/**
+ * Nothing Phone (2) Silhouette: Vertical dual camera module + wireless charging coil.
+ */
+private fun DrawScope.drawPhone2Silhouette(w: Float, h: Float) {
+    val strokeCol = Color(0xFF33333C)
+    val strokeWidth = 1.6.dp.toPx()
+
+    // 1. Vertical Top-Left Dual Camera Pill
+    val camX = w * 0.23f
+    val camY = h * 0.20f
+    val pillW = w * 0.15f
+    val pillH = w * 0.28f
+    val corner = pillW / 2f
+    drawRoundRect(
+        color = Color(0xFF08090C),
+        topLeft = Offset(camX - pillW / 2f, camY - pillH / 2f),
+        size = Size(pillW, pillH),
+        cornerRadius = CornerRadius(corner, corner),
+        style = Stroke(width = strokeWidth)
+    )
+    drawCircle(color = strokeCol, radius = pillW * 0.32f, center = Offset(camX, camY - pillH * 0.22f), style = Stroke(width = strokeWidth))
+    drawCircle(color = strokeCol, radius = pillW * 0.32f, center = Offset(camX, camY + pillH * 0.22f), style = Stroke(width = strokeWidth))
+
+    // 2. Center Wireless Charging Coil Circle
+    val cx = w * 0.5f
+    val cy = h * 0.48f
+    val r = w * 0.32f
+    drawCircle(color = Color(0xFF040406), radius = r, center = Offset(cx, cy))
+    drawCircle(color = strokeCol, radius = r, center = Offset(cx, cy), style = Stroke(width = strokeWidth))
+}
+
+/**
+ * Nothing Phone (1) Silhouette: Vertical dual camera + C-shape coil.
+ */
+private fun DrawScope.drawPhone1Silhouette(w: Float, h: Float) {
+    val strokeCol = Color(0xFF33333C)
+    val strokeWidth = 1.6.dp.toPx()
+
+    // 1. Vertical Top-Left Dual Camera Pill
+    val camX = w * 0.23f
+    val camY = h * 0.20f
+    val pillW = w * 0.15f
+    val pillH = w * 0.28f
+    val corner = pillW / 2f
+    drawRoundRect(
+        color = Color(0xFF08090C),
+        topLeft = Offset(camX - pillW / 2f, camY - pillH / 2f),
+        size = Size(pillW, pillH),
+        cornerRadius = CornerRadius(corner, corner),
+        style = Stroke(width = strokeWidth)
+    )
+    drawCircle(color = strokeCol, radius = pillW * 0.32f, center = Offset(camX, camY - pillH * 0.22f), style = Stroke(width = strokeWidth))
+    drawCircle(color = strokeCol, radius = pillW * 0.32f, center = Offset(camX, camY + pillH * 0.22f), style = Stroke(width = strokeWidth))
+
+    // 2. Center C-shape Coil Circle
+    val cx = w * 0.5f
+    val cy = h * 0.46f
+    val r = w * 0.33f
+    drawCircle(color = strokeCol, radius = r, center = Offset(cx, cy), style = Stroke(width = strokeWidth))
 }
 
 /**
@@ -457,16 +572,11 @@ private fun DrawScope.drawPhone2Glyphs(w: Float, h: Float, brightness: IntArray)
     val segAngle = 360f / 16f
     for (i in 0 until 16) {
         val ch = 4 + i // Center ring channels 4..19
-        val b = if (ch < brightness.size) brightness[ch] / 255f else 0f
-        drawArc(
-            color = if (b > 0.05f) Color.White.copy(alpha = b) else Color(0x22FFFFFF),
-            startAngle = i * segAngle,
-            sweepAngle = segAngle - 3f,
-            useCenter = false,
-            topLeft = Offset(cx - r, cy - r),
-            size = Size(r * 2, r * 2),
-            style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-        )
+        val angleDeg = i * segAngle - 90f // Start from top North (12:00)
+        val rad = angleDeg * (PI / 180.0)
+        val center = Offset((cx + r * cos(rad)).toFloat(), (cy + r * sin(rad)).toFloat())
+        val b = if (ch < brightness.size) brightness[ch] else 0
+        drawDiscreteLedDot(center, b, radius = 5.dp.toPx())
     }
 }
 
@@ -474,15 +584,14 @@ private fun DrawScope.drawPhone1Glyphs(w: Float, h: Float, brightness: IntArray)
     val cx = w * 0.5f
     val cy = h * 0.46f
     val r = w * 0.33f
-    val b0 = if (brightness.isNotEmpty()) brightness[0] / 255f else 0f
-    drawArc(
-        color = if (b0 > 0.05f) Color.White.copy(alpha = b0) else Color(0x22FFFFFF),
-        startAngle = 30f,
-        sweepAngle = 300f,
-        useCenter = false,
-        topLeft = Offset(cx - r, cy - r),
-        size = Size(r * 2, r * 2),
-        style = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round)
-    )
+    val segAngle = 360f / 8f
+    for (i in 0 until 8) {
+        val ch = 8 + i // Center circle channels 8..15
+        val angleDeg = i * segAngle - 90f // Start from top North (12:00)
+        val rad = angleDeg * (PI / 180.0)
+        val center = Offset((cx + r * cos(rad)).toFloat(), (cy + r * sin(rad)).toFloat())
+        val b = if (ch < brightness.size) brightness[ch] else 0
+        drawDiscreteLedDot(center, b, radius = 6.dp.toPx())
+    }
 }
 

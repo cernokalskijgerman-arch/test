@@ -99,6 +99,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (com.nothing.glyphstudio.glyph.GlyphController.connectionState.value != com.nothing.glyphstudio.glyph.HardwareConnectionState.CONNECTED) {
+            com.nothing.glyphstudio.glyph.GlyphController.init(this)
+        } else {
+            com.nothing.glyphstudio.glyph.GlyphController.checkNtDebugSetting(this)
+        }
+    }
+
     private fun checkAppPermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

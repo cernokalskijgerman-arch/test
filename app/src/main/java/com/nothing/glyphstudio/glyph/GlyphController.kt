@@ -115,7 +115,7 @@ object GlyphController {
     }
 
     fun checkNtDebugSetting(context: Context): Boolean {
-        val enabled = try {
+        var enabled = try {
             android.provider.Settings.Global.getInt(
                 context.contentResolver,
                 "nt_glyph_interface_debug_enable",
@@ -124,6 +124,18 @@ object GlyphController {
         } catch (e: Throwable) {
             false
         }
+
+        if (!enabled) {
+            try {
+                android.provider.Settings.Global.putInt(
+                    context.contentResolver,
+                    "nt_glyph_interface_debug_enable",
+                    1
+                )
+                enabled = true
+            } catch (ignored: Throwable) {}
+        }
+
         _isNtDebugEnabled.value = enabled
         if (enabled) {
             log("SUCCESS", "✅ Nothing OS Debug Setting: nt_glyph_interface_debug_enable = 1 (АКТИВИРОВАНО)")
@@ -217,12 +229,21 @@ object GlyphController {
         // Multi-device fallback candidate codes in order of likelihood
         val candidateCodes = listOf(
             primaryTargetCode,
+            "A142",
+            "A142P",
+            "A059",
+            "A065",
+            "AIN065",
+            "A063",
+            "A069",
             "23111",
+            "23113",
+            "24111",
             "22111",
             "20111",
-            "24111",
-            "23113",
-            Build.MODEL
+            "25111",
+            Build.MODEL,
+            Build.DEVICE
         ).distinct()
 
         try {
@@ -324,11 +345,7 @@ object GlyphController {
 
     private fun createHardwareBuilder(targetDeviceCode: String, requiredChannels: Int): KetchumHardwareFrame.Builder {
         val manager = glyphManager
-        val builder = try {
-            KetchumHardwareFrame.Builder(targetDeviceCode)
-        } catch (e: Throwable) {
-            manager?.getGlyphFrameBuilder() ?: KetchumHardwareFrame.Builder()
-        }
+        val builder = manager?.getGlyphFrameBuilder() ?: KetchumHardwareFrame.Builder()
 
         // Defensive reflection check: verify channel list capacity and dynamically expand if necessary
         try {
@@ -609,20 +626,93 @@ object GlyphController {
         }
     }
 
-    fun getSectorDirection(device: NothingDevice, channel: Int): String {
+    /**
+     * Returns the physical clock angle in degrees (0° = North / 12:00 ⬆, 90° = East / 3:00 ➡,
+     * 180° = South / 6:00 ⬇, 270° = West / 9:00 ⬅) from the center of the camera Glyph module.
+     * Returns -1f if channel is invalid.
+     */
+    fun getLedPhysicalAngle(device: NothingDevice, channel: Int): Float {
+        return when (device) {
+            NothingDevice.PHONE_2A -> when (channel) {
+                25 -> 315f // Zone A: Top-Left (North-West, ~10:30)
+                in 0..23 -> {
+                    // Zone C: Right Arc (24 LEDs, sweeping clockwise from ~1:30 (45°) down to ~4:30 (135°))
+                    45f + (channel.toFloat() / 23f) * 90f
+                }
+                24 -> 225f // Zone B: Bottom-Left (South-West, ~7:30)
+                else -> -1f
+            }
+            NothingDevice.PHONE_3A_PRO -> when (channel) {
+                in 0..19 -> {
+                    // Arc 1: Top-Left (20 LEDs, sweeping clockwise from ~9:30 (285°) to ~11:00 (330°))
+                    285f + (channel.toFloat() / 19f) * 45f
+                }
+                in 20..30 -> {
+                    // Arc 3: Right (11 LEDs, sweeping clockwise from ~2:30 (75°) to ~4:10 (125°))
+                    75f + ((channel - 20).toFloat() / 10f) * 50f
+                }
+                in 31..35 -> {
+                    // Arc 2: Bottom-Left (5 LEDs, sweeping clockwise from ~7:30 (225°) to ~8:10 (245°))
+                    225f + ((channel - 31).toFloat() / 4f) * 20f
+                }
+                else -> -1f
+            }
+            NothingDevice.PHONE_2 -> when (channel) {
+                in 4..19 -> {
+                    // Center circular ring (16 LEDs, sweeping full 360° clockwise starting from North at 12:00)
+                    ((channel - 4).toFloat() / 16f) * 360f
+                }
+                0 -> 345f // Top arc left
+                1 -> 15f  // Top arc right
+                else -> -1f
+            }
+            NothingDevice.PHONE_1 -> when (channel) {
+                in 8..15 -> {
+                    // Center circle (8 LEDs, sweeping full 360° clockwise starting from North at 12:00)
+                    ((channel - 8).toFloat() / 8f) * 360f
+                }
+                in 0..4 -> 330f // Top diagonal & camera ring
+                in 5..7 -> 180f // Bottom strip & dot
+                else -> -1f
+            }
+        }
+    }
+
+    /**
+     * Resolves the closest channel in the circular sequence for a given target clock angle.
+     */
+    fun getClosestChannelForAngle(device: NothingDevice, targetClockAngle: Float): Int {
         val seq = getCircularSequence(device)
-        val idx = seq.indexOf(channel)
-        if (idx == -1) return "Указывает на игрока"
-        val total = seq.size
-        val angleDeg = (idx.toFloat() / total.toFloat()) * 360f
+        if (seq.isEmpty()) return 0
+        val targetNorm = ((targetClockAngle % 360f) + 360f) % 360f
+
+        var bestChannel = seq.first()
+        var minDiff = 360f
+
+        for (ch in seq) {
+            val angle = getLedPhysicalAngle(device, ch)
+            if (angle < 0f) continue
+            val diff = kotlin.math.abs(targetNorm - angle).let { if (it > 180f) 360f - it else it }
+            if (diff < minDiff) {
+                minDiff = diff
+                bestChannel = ch
+            }
+        }
+        return bestChannel
+    }
+
+    fun getSectorDirection(device: NothingDevice, channel: Int): String {
+        val angle = getLedPhysicalAngle(device, channel)
+        if (angle < 0f) return "Указывает на игрока"
+        val norm = ((angle % 360f) + 360f) % 360f
         return when {
-            angleDeg in 337.5f..360f || angleDeg in 0f..22.5f -> "СЕВЕР (12:00) ⬆"
-            angleDeg in 22.5f..67.5f -> "СЕВЕРО-ВОСТОК (1:30) ↗"
-            angleDeg in 67.5f..112.5f -> "ВОСТОК (3:00) ➡"
-            angleDeg in 112.5f..157.5f -> "ЮГО-ВОСТОК (4:30) ↘"
-            angleDeg in 157.5f..202.5f -> "ЮГ (6:00) ⬇"
-            angleDeg in 202.5f..247.5f -> "ЮГО-ЗАПАД (7:30) ↙"
-            angleDeg in 247.5f..292.5f -> "ЗАПАД (9:00) ⬅"
+            norm in 337.5f..360f || norm in 0f..22.5f -> "СЕВЕР (12:00) ⬆"
+            norm in 22.5f..67.5f -> "СЕВЕРО-ВОСТОК (1:30) ↗"
+            norm in 67.5f..112.5f -> "ВОСТОК (3:00) ➡"
+            norm in 112.5f..157.5f -> "ЮГО-ВОСТОК (4:30) ↘"
+            norm in 157.5f..202.5f -> "ЮГ (6:00) ⬇"
+            norm in 202.5f..247.5f -> "ЮГО-ЗАПАД (7:30) ↙"
+            norm in 247.5f..292.5f -> "ЗАПАД (9:00) ⬅"
             else -> "СЕВЕРО-ЗАПАД (10:30) ↖"
         }
     }
@@ -748,6 +838,7 @@ object GlyphController {
 
     fun startBottleRoulette(
         scope: CoroutineScope,
+        targetChannel: Int? = null,
         onStop: ((winner: Int) -> Unit)? = null,
         onStep: ((currentChannel: Int, delayMs: Long, step: Int, totalSteps: Int) -> Unit)? = null
     ) {
@@ -755,13 +846,21 @@ object GlyphController {
         _activeAnimation.value = "BOTTLE"
         val seq = getCircularSequence(_activeDevice.value)
         if (seq.isEmpty()) return
-        log("CMD", "🍾 Старт «Световой бутылочки» (${seq.size} светодиодов, круговое вращение)")
+        log("CMD", "🍾 Старт «Световой бутылочки» (${seq.size} светодиодов, круговое вращение${if (targetChannel != null) ", цель #$targetChannel" else ""})")
 
         animationJob = scope.launch(Dispatchers.Default) {
-            var seqIdx = Random.nextInt(seq.size)
-            // 3 to 5 full revolutions + random sector offset
+            val startIdx = Random.nextInt(seq.size)
+            var seqIdx = startIdx
             val fullRevs = 3 + Random.nextInt(3)
-            val totalSteps = fullRevs * seq.size + Random.nextInt(seq.size)
+
+            val totalSteps = if (targetChannel != null && targetChannel in seq) {
+                val targetIdx = seq.indexOf(targetChannel)
+                val stepsToTarget = ((targetIdx - startIdx) % seq.size + seq.size) % seq.size
+                fullRevs * seq.size + stepsToTarget
+            } else {
+                fullRevs * seq.size + Random.nextInt(seq.size)
+            }
+
             var currentDelayMs = 18L
 
             for (step in 0 until totalSteps) {

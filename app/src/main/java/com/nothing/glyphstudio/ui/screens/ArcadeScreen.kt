@@ -199,6 +199,8 @@ private fun SpinTheBottleGame() {
     val activeDevice by GlyphController.activeDevice.collectAsState()
 
     var isSpinning by remember { mutableStateOf(false) }
+    var isTargetMode by remember { mutableStateOf(false) }
+    var targetClockAngle by remember { mutableFloatStateOf(0f) } // Default 0° = North
     var currentSector by remember { mutableStateOf("") }
     var currentDirection by remember { mutableStateOf("") }
     var currentChannel by remember { mutableIntStateOf(-1) }
@@ -209,6 +211,22 @@ private fun SpinTheBottleGame() {
     var isTurboSpeed by remember { mutableStateOf(false) }
 
     // Haptics & Audio Feedback
+    val toneGenerator = remember {
+        try {
+            ToneGenerator(AudioManager.STREAM_MUSIC, 70)
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                toneGenerator?.release()
+            } catch (ignored: Throwable) {}
+        }
+    }
+
     val vibrator = remember {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -231,7 +249,12 @@ private fun SpinTheBottleGame() {
     }
 
     fun playStepTick(delayMs: Long) {
-        // Ticking audio click
+        // Primary crisp mechanical tick via STREAM_MUSIC (always audible)
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_CDMA_KEYPAD_VOLUME_KEY_LITE, 12)
+        } catch (ignored: Throwable) {}
+
+        // Fallback to system audio click
         try {
             audioManager?.playSoundEffect(SoundEffectConstants.CLICK, 0.6f)
         } catch (ignored: Throwable) {}
@@ -248,6 +271,10 @@ private fun SpinTheBottleGame() {
     }
 
     fun playVictoryBurst() {
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 220)
+        } catch (ignored: Throwable) {}
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val timings = longArrayOf(0, 100, 60, 100, 60, 220)
@@ -271,8 +298,15 @@ private fun SpinTheBottleGame() {
         val seq = GlyphController.getCircularSequence(activeDevice)
         if (seq.isEmpty()) return
 
+        val targetCh = if (isTargetMode) {
+            GlyphController.getClosestChannelForAngle(activeDevice, targetClockAngle)
+        } else {
+            null
+        }
+
         GlyphController.startBottleRoulette(
             scope = coroutineScope,
+            targetChannel = targetCh,
             onStep = { ch, delayMs, step, totalSteps ->
                 currentChannel = ch
                 currentSector = GlyphController.getSectorName(activeDevice, ch)
@@ -422,6 +456,128 @@ private fun SpinTheBottleGame() {
                                 fontSize = 11.sp,
                                 textAlign = TextAlign.Center
                             )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Spin Mode Switcher: Random vs Targeted Sector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (!isTargetMode) Color.White else Color(0x1FFFFFFF))
+                        .clickable(enabled = !isSpinning) { isTargetMode = false }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎲 СЛУЧАЙНЫЙ СЕКТОР",
+                        color = if (!isTargetMode) Color.Black else GlyphColors.TextMuted,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isTargetMode) Color.White else Color(0x1FFFFFFF))
+                        .clickable(enabled = !isSpinning) { isTargetMode = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎯 ВЫБРАННЫЙ СЕКТОР",
+                        color = if (isTargetMode) Color.Black else GlyphColors.TextMuted,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Target Direction Chips (Visible when in Target Mode)
+            if (isTargetMode) {
+                Spacer(modifier = Modifier.height(10.dp))
+                val cardinalDirections = listOf(
+                    "СЕВЕР ⬆" to 0f,
+                    "СВ ↗" to 45f,
+                    "ВОСТОК ➡" to 90f,
+                    "ЮВ ↘" to 135f,
+                    "ЮГ ⬇" to 180f,
+                    "ЮЗ ↙" to 225f,
+                    "ЗАПАД ⬅" to 270f,
+                    "СЗ ↖" to 315f
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        cardinalDirections.take(4).forEach { (dirLabel, angle) ->
+                            val isSelected = targetClockAngle == angle
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Color(0x40FFFFFF) else Color(0x14FFFFFF))
+                                    .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                    .clickable(enabled = !isSpinning) {
+                                        targetClockAngle = angle
+                                        val previewCh = GlyphController.getClosestChannelForAngle(activeDevice, angle)
+                                        GlyphController.setSinglePixel(previewCh, 255, trailFade = false)
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dirLabel,
+                                    color = if (isSelected) Color.White else GlyphColors.TextMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        cardinalDirections.drop(4).forEach { (dirLabel, angle) ->
+                            val isSelected = targetClockAngle == angle
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Color(0x40FFFFFF) else Color(0x14FFFFFF))
+                                    .border(1.dp, if (isSelected) Color.White else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+                                    .clickable(enabled = !isSpinning) {
+                                        targetClockAngle = angle
+                                        val previewCh = GlyphController.getClosestChannelForAngle(activeDevice, angle)
+                                        GlyphController.setSinglePixel(previewCh, 255, trailFade = false)
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dirLabel,
+                                    color = if (isSelected) Color.White else GlyphColors.TextMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }

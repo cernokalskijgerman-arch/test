@@ -49,6 +49,108 @@ class GlyphControllerTest {
         assertEquals("Phone 2 center ring circular sequence must have 16 LEDs", 16, seq.size)
         assertEquals("First LED in center ring must be channel 4", 4, seq.first())
         assertEquals("Last LED in center ring must be channel 19", 19, seq.last())
+        assertEquals("All 16 channels must be distinct", 16, seq.distinct().size)
+    }
+
+    @Test
+    fun testCircularSequencePhone1() {
+        val seq = GlyphController.getCircularSequence(NothingDevice.PHONE_1)
+        assertEquals("Phone 1 center circle circular sequence must have 8 LEDs", 8, seq.size)
+        assertEquals("First LED in center circle must be channel 8", 8, seq.first())
+        assertEquals("Last LED in center circle must be channel 15", 15, seq.last())
+        assertEquals("All 8 channels must be distinct", 8, seq.distinct().size)
+    }
+
+    @Test
+    fun testPhysicalAngleAndDirectionPhone2a() {
+        // Channel 25 is Zone A: Top-Left (~10:30, clock angle 315°) -> СЕВЕРО-ЗАПАД ↖
+        val angle25 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_2A, 25)
+        assertEquals(315f, angle25, 0.1f)
+        val dir25 = GlyphController.getSectorDirection(NothingDevice.PHONE_2A, 25)
+        assertTrue("Channel 25 (Zone A) must point North-West: $dir25", dir25.contains("СЕВЕРО-ЗАПАД") || dir25.contains("10:30"))
+
+        // Channel 0 is Zone C Top (~1:30, clock angle 45°) -> СЕВЕРО-ВОСТОК ↗
+        val angle0 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_2A, 0)
+        assertEquals(45f, angle0, 0.1f)
+        val dir0 = GlyphController.getSectorDirection(NothingDevice.PHONE_2A, 0)
+        assertTrue("Channel 0 (Zone C top) must point North-East: $dir0", dir0.contains("СЕВЕРО-ВОСТОК") || dir0.contains("1:30"))
+
+        // Channel 11 is Zone C Mid (~3:00, clock angle ~88°) -> ВОСТОК ➡
+        val dir11 = GlyphController.getSectorDirection(NothingDevice.PHONE_2A, 11)
+        assertTrue("Channel 11 (Zone C mid) must point East: $dir11", dir11.contains("ВОСТОК") || dir11.contains("3:00"))
+
+        // Channel 23 is Zone C Bottom (~4:30, clock angle 135°) -> ЮГО-ВОСТОК ↘
+        val angle23 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_2A, 23)
+        assertEquals(135f, angle23, 0.1f)
+        val dir23 = GlyphController.getSectorDirection(NothingDevice.PHONE_2A, 23)
+        assertTrue("Channel 23 (Zone C bottom) must point South-East: $dir23", dir23.contains("ЮГО-ВОСТОК") || dir23.contains("4:30"))
+
+        // Channel 24 is Zone B: Bottom-Left (~7:30, clock angle 225°) -> ЮГО-ЗАПАД ↙
+        val angle24 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_2A, 24)
+        assertEquals(225f, angle24, 0.1f)
+        val dir24 = GlyphController.getSectorDirection(NothingDevice.PHONE_2A, 24)
+        assertTrue("Channel 24 (Zone B) must point South-West: $dir24", dir24.contains("ЮГО-ЗАПАД") || dir24.contains("7:30"))
+    }
+
+    @Test
+    fun testPhysicalAngleAndDirectionPhone3aPro() {
+        // Channel 0 is start of Arc 1 (~9:30, clock angle 285°) -> ЗАПАД / СЕВЕРО-ЗАПАД
+        val angle0 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_3A_PRO, 0)
+        assertEquals(285f, angle0, 0.1f)
+        val dir0 = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 0)
+        assertTrue("Channel 0 must point West/North-West: $dir0", dir0.contains("ЗАПАД") || dir0.contains("9:00"))
+
+        // Channel 19 is end of Arc 1 (~11:00, clock angle 330°) -> СЕВЕРО-ЗАПАД
+        val angle19 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_3A_PRO, 19)
+        assertEquals(330f, angle19, 0.1f)
+        val dir19 = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 19)
+        assertTrue("Channel 19 must point North-West: $dir19", dir19.contains("СЕВЕРО-ЗАПАД") || dir19.contains("10:30"))
+
+        // Channel 20 is start of Arc 3 (~2:30, clock angle 75°) -> ВОСТОК / СЕВЕРО-ВОСТОК
+        val dir20 = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 20)
+        assertTrue("Channel 20 must point East/North-East: $dir20", dir20.contains("ВОСТОК") || dir20.contains("СЕВЕРО-ВОСТОК"))
+
+        // Channel 31 is start of Arc 2 (~7:30, clock angle 225°) -> ЮГО-ЗАПАД
+        val angle31 = GlyphController.getLedPhysicalAngle(NothingDevice.PHONE_3A_PRO, 31)
+        assertEquals(225f, angle31, 0.1f)
+        val dir31 = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 31)
+        assertTrue("Channel 31 must point South-West: $dir31", dir31.contains("ЮГО-ЗАПАД") || dir31.contains("7:30"))
+
+        // Invalid channel fallback
+        val dirUnknown = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 999)
+        assertEquals("Unknown channel must return fallback text", "Указывает на игрока", dirUnknown)
+    }
+
+    @Test
+    fun testClosestChannelResolution() {
+        // Target angle 45° (North-East) on Phone 2a should resolve to channel 0
+        val closestNE = GlyphController.getClosestChannelForAngle(NothingDevice.PHONE_2A, 45f)
+        assertEquals("Closest channel for 45° (NE) on Phone 2a must be 0", 0, closestNE)
+
+        // Target angle 315° (North-West) on Phone 2a should resolve to channel 25
+        val closestNW = GlyphController.getClosestChannelForAngle(NothingDevice.PHONE_2A, 315f)
+        assertEquals("Closest channel for 315° (NW) on Phone 2a must be 25", 25, closestNW)
+
+        // Target angle 225° (South-West) on Phone 2a should resolve to channel 24
+        val closestSW = GlyphController.getClosestChannelForAngle(NothingDevice.PHONE_2A, 225f)
+        assertEquals("Closest channel for 225° (SW) on Phone 2a must be 24", 24, closestSW)
+    }
+
+    @Test
+    fun testTargetedRouletteMath() {
+        val seq = GlyphController.getCircularSequence(NothingDevice.PHONE_2A)
+
+        // For any starting index and any target channel in sequence,
+        // verify the step formula lands precisely on targetIdx.
+        for (startIdx in seq.indices) {
+            for (targetIdx in seq.indices) {
+                val fullRevs = 3
+                val stepsToTarget = ((targetIdx - startIdx) % seq.size + seq.size) % seq.size
+                val totalSteps = fullRevs * seq.size + stepsToTarget
+                val finalIdx = (startIdx + totalSteps) % seq.size
+                assertEquals("Final index must match target index", targetIdx, finalIdx)
+            }
+        }
     }
 
     @Test
@@ -72,17 +174,6 @@ class GlyphControllerTest {
 
         val sec2aB = GlyphController.getSectorName(NothingDevice.PHONE_2A, 24)
         assertTrue("Channel 24 on 2a must be Zone B", sec2aB.contains("ЗОНА B") && sec2aB.contains("НИЗ-ЛЕВО"))
-    }
-
-    @Test
-    fun testSectorDirectionResolution() {
-        // Channel at start of circular sequence should point North
-        val dir0 = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 0)
-        assertTrue("Direction for LED 0 should point North", dir0.contains("СЕВЕР") || dir0.contains("12:00"))
-
-        // Non-existent channel fallback
-        val dirUnknown = GlyphController.getSectorDirection(NothingDevice.PHONE_3A_PRO, 999)
-        assertEquals("Unknown channel must return fallback pointer text", "Указывает на игрока", dirUnknown)
     }
 
     @Test
