@@ -706,9 +706,9 @@ fun GlyphTestScreen(
                         if (isBottle) {
                             GlyphController.stopBottleRoulette()
                         } else {
-                            GlyphController.startBottleRoulette(coroutineScope) { winner ->
+                            GlyphController.startBottleRoulette(scope = coroutineScope, onStop = { winner ->
                                 Toast.makeText(context, "Остановка на сегменте #$winner!", Toast.LENGTH_SHORT).show()
-                            }
+                            })
                         }
                     }
                 )

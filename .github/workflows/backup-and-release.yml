@@ -67,13 +67,15 @@ jobs:
           if [ -f gradle-build.log ]; then tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY; fi
           if [ -f expo-build.log ]; then tail -n 120 expo-build.log >> $GITHUB_STEP_SUMMARY; fi
           echo '```' >> $GITHUB_STEP_SUMMARY
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-debug-log
-          if [ -f gradle-build.log ]; then cp gradle-build.log ci-gradle-build.log; git add ci-gradle-build.log; fi
-          if [ -f expo-build.log ]; then cp expo-build.log ci-expo-build.log; git add ci-expo-build.log; fi
-          git commit -m "ci: capture build failure log" || true
-          git push origin ci-debug-log --force || true
+
+      - name: Upload Failure Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: |
+            gradle-build.log
+            expo-build.log
 
       - name: Prepare APKs for Release
         run: |

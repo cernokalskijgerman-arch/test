@@ -748,8 +748,8 @@ object GlyphController {
 
     fun startBottleRoulette(
         scope: CoroutineScope,
-        onStep: ((currentChannel: Int, delayMs: Long, step: Int, totalSteps: Int) -> Unit)? = null,
-        onStop: ((Int) -> Unit)? = null
+        onStop: ((winner: Int) -> Unit)? = null,
+        onStep: ((currentChannel: Int, delayMs: Long, step: Int, totalSteps: Int) -> Unit)? = null
     ) {
         stopAllAnimations(resetFrame = false)
         _activeAnimation.value = "BOTTLE"
