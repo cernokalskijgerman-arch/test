@@ -83,16 +83,6 @@ jobs:
           if [ -f gradle-build.log ]; then tail -n 80 gradle-build.log >> $GITHUB_STEP_SUMMARY; fi
           if [ -f expo-build.log ]; then tail -n 80 expo-build.log >> $GITHUB_STEP_SUMMARY; fi
           echo '```' >> $GITHUB_STEP_SUMMARY
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git checkout -B ci-debug-log
-          if [ -f unit-tests.log ]; then cp unit-tests.log ci-unit-tests.log; git add ci-unit-tests.log; fi
-          if [ -d app/build/test-results/testDebugUnitTest ]; then cp -r app/build/test-results/testDebugUnitTest ci-test-results; git add ci-test-results; fi
-          if [ -f gradle-build.log ]; then cp gradle-build.log ci-gradle-build.log; git add ci-gradle-build.log; fi
-          if [ -f expo-build.log ]; then cp expo-build.log ci-expo-build.log; git add ci-expo-build.log; fi
-          git commit -m "ci: capture build failure log" || true
-          git push origin ci-debug-log --force || true
 
       - name: Upload Failure Logs
         if: failure()
