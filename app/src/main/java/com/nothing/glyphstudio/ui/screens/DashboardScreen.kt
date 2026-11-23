@@ -1,6 +1,7 @@
 package com.nothing.glyphstudio.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import com.nothing.glyphstudio.glyph.NothingDevice
 import com.nothing.glyphstudio.theme.GlyphColors
 import com.nothing.glyphstudio.ui.components.GlyphSimulatorView
 import com.nothing.glyphstudio.ui.components.LiquidGlassCard
+import com.nothing.glyphstudio.ui.components.NothingBadge
 
 enum class ScreenDestination {
     DASHBOARD,
