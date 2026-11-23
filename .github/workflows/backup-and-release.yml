@@ -43,8 +43,14 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          set -o pipefail
-          ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee unit-tests.log
+          ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee unit-tests.log || {
+            echo "::error::Unit Tests Failed"
+            for f in app/build/test-results/testDebugUnitTest/*.xml; do
+              echo "=== $f ==="
+              cat "$f"
+            done
+            exit 1
+          }
 
       - name: Build Native Hardware APK with Gradle
         run: |
@@ -69,14 +75,20 @@ jobs:
         run: |
           echo "### ❌ Gradle Build Failure Log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          if [ -f unit-tests.log ]; then tail -n 120 unit-tests.log >> $GITHUB_STEP_SUMMARY; fi
-          if [ -f gradle-build.log ]; then tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY; fi
-          if [ -f expo-build.log ]; then tail -n 120 expo-build.log >> $GITHUB_STEP_SUMMARY; fi
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            echo "--- $f ---" >> $GITHUB_STEP_SUMMARY
+            cat "$f" >> $GITHUB_STEP_SUMMARY
+          done
+          if [ -f unit-tests.log ]; then tail -n 80 unit-tests.log >> $GITHUB_STEP_SUMMARY; fi
+          if [ -f gradle-build.log ]; then tail -n 80 gradle-build.log >> $GITHUB_STEP_SUMMARY; fi
+          if [ -f expo-build.log ]; then tail -n 80 expo-build.log >> $GITHUB_STEP_SUMMARY; fi
           echo '```' >> $GITHUB_STEP_SUMMARY
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -B ci-debug-log
           if [ -f unit-tests.log ]; then cp unit-tests.log ci-unit-tests.log; git add ci-unit-tests.log; fi
+          if [ -d app/build/test-results/testDebugUnitTest ]; then cp -r app/build/test-results/testDebugUnitTest ci-test-results; git add ci-test-results; fi
           if [ -f gradle-build.log ]; then cp gradle-build.log ci-gradle-build.log; git add ci-gradle-build.log; fi
           if [ -f expo-build.log ]; then cp expo-build.log ci-expo-build.log; git add ci-expo-build.log; fi
           git commit -m "ci: capture build failure log" || true
