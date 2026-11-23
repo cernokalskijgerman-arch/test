@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlyphColors } from './src/theme/colors';
+import NothingGlyph from './modules/nothing-glyph';
 
 import GlyphCameraSilhouette from './src/components/GlyphCameraSilhouette';
 import LiquidGlassTabBar from './src/components/LiquidGlassTabBar';
@@ -33,7 +34,7 @@ const TABS = [
   { id: 1, label: 'АВТО-ОБХОД', subtitle: 'Бегущий свет 36 LED' },
   { id: 2, label: 'СЕКВЕНСОР', subtitle: '8-шаговые ритмы' },
   { id: 3, label: 'МУЗЫКА', subtitle: 'FFT визуализатор частот' },
-  { id: 4, label: 'УТИЛИТЫ', subtitle: 'Фонарик, таймер, аркада' },
+  { id: 4, label: 'УТИЛИТЫ', subtitle: 'Таймер, батарея, аркада' },
 ];
 
 // Calculate step delay normalized to physical arc angular span
@@ -141,6 +142,7 @@ export default function App() {
     setMasterBrightness(0);
     masterBrightnessRef.current = 0;
     setActivePixel(null);
+    NothingGlyph.turnOff();
     if (isAutoWalkRef.current) {
       setIsAutoWalk(false);
     }
@@ -437,6 +439,35 @@ export default function App() {
     4: 'ИНСТРУМЕНТЫ',
   }), [masterBrightness, isAutoWalk, autoWalkSpeed]);
 
+  // Hardware initialization on mount
+  useEffect(() => {
+    NothingGlyph.initHardware();
+  }, []);
+
+  // Hardware synchronization: streams all UI updates directly to physical Nothing Phone Glyphs
+  useEffect(() => {
+    if (masterBrightness === 0) {
+      NothingGlyph.turnOff();
+      return;
+    }
+
+    if (pixelLevels !== null && Array.isArray(pixelLevels)) {
+      NothingGlyph.setPixelLevels(pixelLevels);
+    } else if (activePixel !== null) {
+      if (Array.isArray(activePixel)) {
+        NothingGlyph.setVirtualPixels(activePixel, masterBrightness);
+      } else {
+        NothingGlyph.setVirtualPixel(activePixel, masterBrightness);
+      }
+    } else {
+      NothingGlyph.setArcsBrightness(
+        effectiveBrightness[0],
+        effectiveBrightness[1],
+        effectiveBrightness[2]
+      );
+    }
+  }, [effectiveBrightness, activePixel, pixelLevels, masterBrightness]);
+
   if (!fontsLoaded && !fontError) {
     return (
       <View style={styles.loadingContainer}>
@@ -485,7 +516,7 @@ export default function App() {
           activePixel={activePixel}
           pixelLevels={pixelLevels}
           onArcPress={handleArcPress}
-          size={265}
+          size={285}
         />
       </View>
 
