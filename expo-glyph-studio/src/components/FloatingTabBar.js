@@ -81,36 +81,60 @@ export function FloatingTabBar({
     transform: [{ translateX: translateX.value }],
   }));
 
-  const handlePress = useCallback((index) => {
-    const isFocused = activeIndex === index;
+  // Synchronized refs for live state & props to eliminate stale closures
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
 
-    if (isFocused) {
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+
+  const onSelectTabRef = useRef(onSelectTab);
+  onSelectTabRef.current = onSelectTab;
+
+  const routesRef = useRef(routes);
+  routesRef.current = routes;
+
+  const lastActiveIndexRef = useRef(activeIndex);
+  lastActiveIndexRef.current = activeIndex;
+
+  const handlePress = useCallback((index) => {
+    const currentActive = activeIndexRef.current;
+
+    if (currentActive === index) {
       // Re-tap on active tab: safely do nothing, never open unwanted popup modals
       return;
     }
 
+    lastActiveIndexRef.current = index;
+
     // Light tactile feedback on tab switch
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-    if (state && navigation) {
-      const route = state.routes[index];
-      const event = navigation.emit({
-        type: 'tabPress',
-        target: route.key,
-        canPreventDefault: true,
-      });
-      if (!event.defaultPrevented) {
-        navigation.navigate(route.name);
+    const nav = navigationRef.current;
+    const st = stateRef.current;
+    const onSelect = onSelectTabRef.current;
+
+    if (st && nav) {
+      const route = st.routes[index];
+      if (route) {
+        const event = nav.emit({
+          type: 'tabPress',
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (!event.defaultPrevented) {
+          nav.navigate(route.name);
+        }
       }
-    } else if (onSelectTab) {
-      onSelectTab(index);
+    } else if (onSelect) {
+      onSelect(index);
     }
-  }, [activeIndex, state, navigation, onSelectTab]);
+  }, []);
 
   // Real-time Scrubbing / Drag-to-Select (Зажатие и наведение на нужный пункт)
-  const lastActiveIndexRef = useRef(activeIndex);
-  lastActiveIndexRef.current = activeIndex;
-
   const widthRef = useRef(INNER_WIDTH);
   widthRef.current = INNER_WIDTH;
 
@@ -129,15 +153,19 @@ export function FloatingTabBar({
 
   const scrubResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+        return Math.abs(gestureState.dx) > 10;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10;
       },
       onPanResponderGrant: (evt) => {
-        isScrubbingRef.current = false;
+        isScrubbingRef.current = true;
         const x = evt.nativeEvent.locationX;
         const target = calculateIndexFromLocation(x);
-        if (target !== lastActiveIndexRef.current) {
+        if (target !== activeIndexRef.current && target !== lastActiveIndexRef.current) {
           lastActiveIndexRef.current = target;
           handlePress(target);
         }
@@ -146,7 +174,7 @@ export function FloatingTabBar({
         isScrubbingRef.current = true;
         const x = evt.nativeEvent.locationX;
         const target = calculateIndexFromLocation(x);
-        if (target !== lastActiveIndexRef.current) {
+        if (target !== activeIndexRef.current && target !== lastActiveIndexRef.current) {
           lastActiveIndexRef.current = target;
           handlePress(target);
         }
@@ -258,14 +286,23 @@ export function FloatingTabBar({
           const IconComponent = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
 
           return (
-            <TabItem
+            <Pressable
               key={route.id !== undefined ? route.id : (route.key || index)}
-              isFocused={isFocused}
-              color={color}
-              label={label}
-              IconComponent={IconComponent}
-              tabWidth={TAB_WIDTH}
-            />
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={label}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              onPress={() => handlePress(index)}
+              style={[styles.tab, { width: TAB_WIDTH }]}
+            >
+              <TabItem
+                isFocused={isFocused}
+                color={color}
+                label={label}
+                IconComponent={IconComponent}
+                tabWidth={TAB_WIDTH}
+              />
+            </Pressable>
           );
         })}
       </BlurView>
@@ -297,25 +334,23 @@ function TabItem({
   return (
     <View
       pointerEvents="none"
-      style={[styles.tab, { width: tabWidth }]}
+      style={styles.tabContent}
     >
-      <View style={styles.tabContent}>
-        <Animated.View style={iconAnimStyle}>
-          {IconComponent && (
-            <IconComponent
-              color={color}
-              size={isFocused ? 20 : 18}
-              strokeWidth={isFocused ? 2.4 : 1.8}
-            />
-          )}
-        </Animated.View>
-
-        {isFocused && label && (
-          <Text numberOfLines={1} style={[styles.label, { color }]}>
-            {label}
-          </Text>
+      <Animated.View style={iconAnimStyle}>
+        {IconComponent && (
+          <IconComponent
+            color={color}
+            size={isFocused ? 20 : 18}
+            strokeWidth={isFocused ? 2.4 : 1.8}
+          />
         )}
-      </View>
+      </Animated.View>
+
+      {isFocused && label && (
+        <Text numberOfLines={1} style={[styles.label, { color }]}>
+          {label}
+        </Text>
+      )}
     </View>
   );
 }

@@ -36,6 +36,12 @@ jobs:
           cd expo-glyph-studio
           npm ci
 
+      - name: Run E2E Verification Tests
+        run: node tests/e2e_runner.js
+
+      - name: Run Nothing Glyph Hardware Integration Tests
+        run: node tests/nothing_glyph_hardware.test.js
+
       - name: Grant Execute Permission for Gradlew
         run: |
           chmod +x gradlew
@@ -63,6 +69,11 @@ jobs:
           npx expo prebuild --platform android --no-install
           cd ..
           chmod +x expo-glyph-studio/android/gradlew
+          if [ ! -f expo-glyph-studio/android/app/debug.keystore ] && [ -f app/debug.keystore ]; then
+            echo "Copying debug.keystore to expo-glyph-studio/android/app/"
+            mkdir -p expo-glyph-studio/android/app
+            cp app/debug.keystore expo-glyph-studio/android/app/debug.keystore
+          fi
 
       - name: Build Liquid Glass Studio APK with Gradle
         run: |

@@ -73,7 +73,7 @@ export default function CategorySwitcherModal({
   };
 
   return (
-    <View style={styles.overlayRoot} pointerEvents="auto">
+    <View style={styles.overlayRoot} pointerEvents={visible ? "auto" : "none"}>
       {/* Blurred Backdrop */}
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>

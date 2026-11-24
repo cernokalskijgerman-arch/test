@@ -80,4 +80,19 @@ export const NothingGlyph = {
   },
 };
 
+export const {
+  initHardware,
+  isConnected,
+  getDeviceModel,
+  turnOff,
+  setBrightness,
+  setChannel,
+  setChannels,
+  setArcBrightness,
+  setArcsBrightness,
+  setVirtualPixel,
+  setVirtualPixels,
+  setPixelLevels,
+} = NothingGlyph;
+
 export default NothingGlyph;

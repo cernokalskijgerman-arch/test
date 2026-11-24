@@ -354,6 +354,14 @@ export default function App() {
       setBrightness([b, b, b]);
     }
 
+    if (cur === 3 && tabIndex !== 3) {
+      setActivePixel(null);
+      activePixelRef.current = null;
+      setPixelLevels(null);
+      const b = masterBrightnessRef.current > 0 ? masterBrightnessRef.current : 255;
+      setBrightness([b, b, b]);
+    }
+
     if (cur === 4 && tabIndex !== 4) {
       setActivePixel(null);
       activePixelRef.current = null;
@@ -396,6 +404,8 @@ export default function App() {
       }),
     ]).start();
   }, [screenFadeAnim, screenScaleAnim, screenTranslateX]);
+
+  const handleTabSelect = handleTabSwitch;
 
   // Horizontal swipe between tabs (dynamic currentTabRef lookup avoids stale closure)
   const panResponder = useRef(
@@ -516,7 +526,7 @@ export default function App() {
           activePixel={activePixel}
           pixelLevels={pixelLevels}
           onArcPress={handleArcPress}
-          size={285}
+          size={215}
         />
       </View>
 
@@ -565,6 +575,7 @@ export default function App() {
           <VisualizerScreen
             brightness={brightness}
             onBrightnessChange={setBrightness}
+            onActivePixelChange={handleActivePixelChange}
           />
         )}
         {currentTab === 4 && (

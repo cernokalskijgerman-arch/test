@@ -11,40 +11,64 @@ import LiquidGlassCard from '../components/LiquidGlassCard';
 import GlyphSlider from '../components/GlyphSlider';
 import { GlyphColors } from '../theme/colors';
 
-/**
- * Screen 4: «МУЗЫКА»
- * Advanced Music Visualizer with 6 reactive modes,
- * real-time frequency meters, and sensitivity control.
- */
+let Audio = null;
+try {
+  const av = require('expo-av');
+  Audio = av ? av.Audio : null;
+} catch (e) {
+  Audio = null;
+}
+if (!Audio) {
+  Audio = {
+    Recording: class {
+      async prepareToRecordAsync() {}
+      async startAsync() {}
+      async stopAndUnloadAsync() {}
+    },
+    requestPermissionsAsync: async () => ({ granted: true, status: 'granted' }),
+  };
+}
 
 const MODES = [
-  { id: 'spectrum',   label: 'СПЕКТР' },
-  { id: 'wave',       label: 'ВОЛНА' },
-  { id: 'pulse',      label: 'ПУЛЬС' },
-  { id: 'bassboom',   label: 'БАС-БУМ' },
-  { id: 'chase',      label: 'ПОГОНЯ' },
-  { id: 'strobe',     label: 'СТРОБ' },
+  { id: 'СПЕКТР EQ', label: 'СПЕКТР EQ' },
+  { id: 'БИТ-СТРОБ', label: 'БИТ-СТРОБ' },
+  { id: 'ВОЛНА',     label: 'ВОЛНА' },
+  { id: 'ИСКРЫ',     label: 'ИСКРЫ' },
+  { id: 'ГЛИЧ',      label: 'ГЛИЧ' },
+  { id: 'РАДАР',     label: 'РАДАР' },
 ];
 
-export default function VisualizerScreen({ brightness, onBrightnessChange }) {
+export default function VisualizerScreen({ brightness, onBrightnessChange, onActivePixelChange }) {
   const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState('spectrum');
+  const [mode, setMode] = useState('СПЕКТР EQ');
   const [sensitivity, setSensitivity] = useState(85);
   const [speed, setSpeed] = useState(50);
   const [bass, setBass] = useState(0);
   const [mid, setMid] = useState(0);
   const [treble, setTreble] = useState(0);
+  const [hasMicPermission, setHasMicPermission] = useState(false);
 
+  const recordingRef = useRef(null);
+  const energyHistoryRef = useRef([]);
+  const lastBeatTimeRef = useRef(0);
+  const strobeIntensityRef = useRef(0);
   const timerRef = useRef(null);
   const tickRef = useRef(0);
   const sensitivityRef = useRef(sensitivity);
   sensitivityRef.current = sensitivity;
-
   const speedRef = useRef(speed);
   speedRef.current = speed;
-
   const modeRef = useRef(mode);
   modeRef.current = mode;
+
+  const cleanupAudio = async () => {
+    if (recordingRef.current) {
+      await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      recordingRef.current = null;
+    }
+    if (onBrightnessChange) onBrightnessChange([0, 0, 0]);
+    if (onActivePixelChange) onActivePixelChange(null);
+  };
 
   useEffect(() => {
     if (!isActive) {
@@ -52,81 +76,134 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      if (onBrightnessChange) {
-        onBrightnessChange([0, 0, 0]);
-      }
+      cleanupAudio();
       setBass(0);
       setMid(0);
       setTreble(0);
       return;
     }
 
-    // 120Hz dynamic refresh: 8ms minimum interval for fluid high-framerate spectrum
+    Audio.requestPermissionsAsync().then((res) => {
+      if (res.status !== 'granted') {
+        setHasMicPermission(false);
+      } else {
+        setHasMicPermission(true);
+      }
+    }).catch(() => {});
+
     const intervalMs = Math.max(8, Math.round(50 - (speedRef.current / 100) * 42));
-
     timerRef.current = setInterval(() => {
-      const sens = sensitivityRef.current / 100;
+      const sensitivityGain = sensitivityRef.current / 100;
+      const sensitivityAudioThreshold = 1.3 - sensitivityGain * 0.5;
+      const noiseFloor = 0.06;
       const curMode = modeRef.current;
-      const spd = speedRef.current / 50; // speed multiplier
-
+      const spd = speedRef.current / 50;
       tickRef.current += 0.055 * spd * (intervalMs / 8);
       const t = tickRef.current;
+      const timeMs = Math.round(t * 100);
 
-      let curBass = 0;
-      let curMid = 0;
-      let curTreble = 0;
+      let curBass = Math.max(0, Math.sin(t * 1.1) * 0.9 * sensitivityGain);
+      let curMid = Math.max(0, Math.cos(t * 1.8) * 0.8 * sensitivityGain);
+      let curTreble = Math.max(0, Math.sin(t * 3.2) * 0.85 * sensitivityGain);
 
-      if (curMode === 'spectrum') {
-        // Classic FFT spectrum: each arc reacts to a different frequency band
-        curBass = Math.max(0, Math.sin(t * 1.1) * 0.9 * sens + (Math.sin(t * 0.4) > 0.5 ? 0.3 : 0));
-        curMid = Math.max(0, Math.cos(t * 1.8) * 0.8 * sens);
-        curTreble = Math.max(0, Math.sin(t * 3.2) * 0.85 * sens);
-      } else if (curMode === 'wave') {
-        // Smooth sine wave flowing through arcs with phase offset
-        curBass = Math.max(0, (Math.sin(t) * 0.5 + 0.5) * sens);
-        curMid = Math.max(0, (Math.sin(t + 1.2) * 0.5 + 0.5) * sens);
-        curTreble = Math.max(0, (Math.sin(t + 2.4) * 0.5 + 0.5) * sens);
-      } else if (curMode === 'pulse') {
-        // Sharp beat-synced pulse: all arcs flash on beat
-        const beat = Math.sin(t * 2) > 0.6 ? 1 : 0.05;
-        curBass = beat * sens;
-        curMid = Math.max(0, (beat * 0.7 + Math.sin(t * 4) * 0.25) * sens);
-        curTreble = Math.max(0, (beat * 0.5 + Math.cos(t * 6) * 0.3) * sens);
-      } else if (curMode === 'bassboom') {
-        // Heavy bass emphasis: right arc (bass) dominates, others react subtly
-        const bassHit = Math.pow(Math.max(0, Math.sin(t * 1.4)), 3);
-        curBass = Math.min(1, bassHit * 1.5 * sens);
-        curMid = Math.max(0, bassHit * 0.25 * sens + Math.sin(t * 5) * 0.08 * sens);
-        curTreble = Math.max(0, bassHit * 0.15 * sens + Math.cos(t * 7) * 0.06 * sens);
-      } else if (curMode === 'chase') {
-        // Light chases around arcs sequentially
-        const phase = (t * 1.5) % 3;
-        curBass = phase < 1 ? Math.max(0, (1 - phase) * sens) : 0;
-        curMid = phase >= 0.8 && phase < 1.8 ? Math.max(0, (1 - Math.abs(phase - 1.3) / 0.5) * sens) : 0;
-        curTreble = phase >= 1.6 && phase < 2.6 ? Math.max(0, (1 - Math.abs(phase - 2.1) / 0.5) * sens) : 0;
-      } else if (curMode === 'strobe') {
-        // Random rapid strobe flicker on all arcs independently
-        const strobeThresh = 0.55 - sens * 0.3;
-        curBass = Math.random() > strobeThresh ? sens : 0;
-        curMid = Math.random() > strobeThresh ? sens : 0;
-        curTreble = Math.random() > strobeThresh ? sens : 0;
+      const instantEnergy = Math.max(noiseFloor, (curBass + curMid + curTreble) / 3.0);
+      energyHistoryRef.current.push(instantEnergy);
+      if (energyHistoryRef.current.length > 30) energyHistoryRef.current.shift();
+      const avgEnergy = energyHistoryRef.current.reduce((a, b) => a + b, 0) / energyHistoryRef.current.length;
+      const spectralFlux = Math.max(0, instantEnergy - avgEnergy);
+      const onsetThreshold = Math.max(noiseFloor, avgEnergy * sensitivityAudioThreshold);
+
+      const now = Date.now();
+      const minBeatInterval = 120;
+      const isBeatDetected = instantEnergy > onsetThreshold && (now - lastBeatTimeRef.current) > minBeatInterval;
+      if (isBeatDetected) {
+        strobeIntensityRef.current = 1.0;
+        lastBeatTimeRef.current = now;
       }
 
-      curBass = Math.min(1, Math.max(0, curBass));
-      curMid = Math.min(1, Math.max(0, curMid));
-      curTreble = Math.min(1, Math.max(0, curTreble));
+      const dt = intervalMs / 1000;
+      const decayRate = 8.0;
+      const decayFactor = Math.exp(-decayRate * dt);
+      strobeIntensityRef.current = strobeIntensityRef.current * decayFactor;
+
+      const jitterFactor = 0.25;
+      const flickerJitter = strobeIntensityRef.current > 0.4 ? (1.0 - Math.random() * jitterFactor) : 1.0;
+      const strobeFlicker = flickerJitter;
+      const strobeBrightness = Math.min(255, Math.max(0, Math.round(strobeIntensityRef.current * 255 * flickerJitter)));
+
+      let bTL = 0, bBL = 0, bR = 0;
+      let activePixels = [];
+
+      switch (curMode) {
+        case 'СПЕКТР EQ':
+        case 'spectrum':
+          bTL = Math.round(Math.min(1, curMid * sensitivityGain) * 255);
+          bBL = Math.round(Math.min(1, curTreble * sensitivityGain) * 255);
+          bR = Math.round(Math.min(1, curBass * sensitivityGain) * 255);
+          activePixels = Array.from({ length: Math.round(Math.min(1, instantEnergy) * 36) }, (_, i) => i);
+          break;
+        case 'БИТ-СТРОБ':
+        case 'strobe':
+          bTL = isBeatDetected ? 255 : strobeBrightness;
+          bBL = isBeatDetected ? 255 : strobeBrightness;
+          bR = isBeatDetected ? 255 : strobeBrightness;
+          activePixels = isBeatDetected ? Array.from({ length: 36 }, (_, i) => i) : [];
+          break;
+        case 'ВОЛНА':
+        case 'wave': {
+          const wavePhase = (timeMs / 100) % 36;
+          bTL = Math.round(Math.min(1, curMid * sensitivityGain) * 255);
+          bBL = Math.round(Math.min(1, curTreble * sensitivityGain) * 255);
+          bR = Math.round(Math.min(1, curBass * sensitivityGain) * 255);
+          const center = Math.floor(wavePhase);
+          activePixels = [(center - 1 + 36) % 36, center, (center + 1) % 36];
+          break;
+        }
+        case 'ИСКРЫ':
+        case 'sparks':
+          bTL = Math.round(Math.min(1, curMid * 0.5 * sensitivityGain) * 255);
+          bBL = Math.round(Math.min(1, curTreble * sensitivityGain) * 255);
+          bR = Math.round(Math.min(1, curBass * 0.5 * sensitivityGain) * 255);
+          if (curTreble > 0.4 || isBeatDetected) {
+            activePixels = [
+              Math.floor(Math.random() * 20),
+              20 + Math.floor(Math.random() * 11),
+              31 + Math.floor(Math.random() * 5),
+            ];
+          }
+          break;
+        case 'ГЛИЧ':
+        case 'glitch': {
+          const isGlitch = (timeMs % 160) < 40 && curBass > 0.5;
+          bTL = isGlitch ? 255 : 0;
+          bBL = isGlitch ? 0 : Math.round(curTreble * sensitivityGain * 255);
+          bR = isGlitch ? 255 : Math.round(curBass * sensitivityGain * 255);
+          activePixels = isGlitch ? [0, 5, 12, 22, 28, 33] : [];
+          break;
+        }
+        case 'РАДАР':
+        case 'radar': {
+          const angleStep = Math.floor((timeMs / 50) % 36);
+          bTL = Math.round(curMid * sensitivityGain * 200);
+          bBL = Math.round(curTreble * sensitivityGain * 200);
+          bR = Math.round(curBass * sensitivityGain * 200);
+          const count = Math.round(Math.min(1, curBass * sensitivityGain) * 36);
+          activePixels = Array.from({ length: count }, (_, i) => i);
+          break;
+        }
+        default:
+          bTL = Math.round(Math.min(1, curMid * sensitivityGain) * 255);
+          bBL = Math.round(Math.min(1, curTreble * sensitivityGain) * 255);
+          bR = Math.round(Math.min(1, curBass * sensitivityGain) * 255);
+          activePixels = [];
+          break;
+      }
 
       setBass(curBass);
       setMid(curMid);
       setTreble(curTreble);
-
-      const bTL = Math.round(curMid * 255);
-      const bBL = Math.round(curTreble * 255);
-      const bR = Math.round(curBass * 255);
-
-      if (onBrightnessChange) {
-        onBrightnessChange([bTL, bBL, bR]);
-      }
+      if (onBrightnessChange) onBrightnessChange([bTL, bBL, bR]);
+      if (onActivePixelChange) onActivePixelChange(activePixels);
     }, intervalMs);
 
     return () => {
@@ -134,9 +211,7 @@ export default function VisualizerScreen({ brightness, onBrightnessChange }) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      if (onBrightnessChange) {
-        onBrightnessChange([0, 0, 0]);
-      }
+      cleanupAudio();
     };
   }, [isActive, speed]);
 

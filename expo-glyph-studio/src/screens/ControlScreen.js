@@ -119,7 +119,7 @@ export default function ControlScreen({
                 style={[styles.presetBtn, isSelected && styles.presetBtnActive]}
                 onPress={() => setBrightnessPreset(item.val)}
                 activeOpacity={0.7}
-                hitSlop={{ top: 6, bottom: 6 }}
+                hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
               >
                 <Text
                   style={[
@@ -163,7 +163,7 @@ export default function ControlScreen({
             style={[styles.arcToggleBtn, brightness[0] > 10 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(0)}
             activeOpacity={0.7}
-            hitSlop={{ top: 7, bottom: 7, left: 8, right: 8 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text
               style={[
@@ -208,7 +208,7 @@ export default function ControlScreen({
             style={[styles.arcToggleBtn, brightness[1] > 10 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(1)}
             activeOpacity={0.7}
-            hitSlop={{ top: 7, bottom: 7, left: 8, right: 8 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text
               style={[
@@ -253,7 +253,7 @@ export default function ControlScreen({
             style={[styles.arcToggleBtn, brightness[2] > 10 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(2)}
             activeOpacity={0.7}
-            hitSlop={{ top: 7, bottom: 7, left: 8, right: 8 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text
               style={[
@@ -320,6 +320,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   masterBtn: {
+    minWidth: 44,
+    minHeight: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
@@ -359,6 +363,8 @@ const styles = StyleSheet.create({
   },
   presetBtn: {
     flex: 1,
+    minHeight: 28,
+    justifyContent: 'center',
     paddingVertical: 3.5,
     borderRadius: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -437,6 +443,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   arcToggleBtn: {
+    minWidth: 44,
+    minHeight: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',

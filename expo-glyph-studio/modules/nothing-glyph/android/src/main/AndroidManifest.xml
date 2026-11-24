@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Official Nothing OS Glyph Hardware Permissions -->
+    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
+    <uses-permission android:name="com.nothing.glyph.permission.GLYPH" />
+
+    <!-- Nothing OS Package Visibility queries for IPC Service Binding -->
+    <queries>
+        <package android:name="com.nothing.thirdparty" />
+        <intent>
+            <action android:name="com.nothing.thirdparty.bind_glyphservice" />
+        </intent>
+    </queries>
+
+</manifest>

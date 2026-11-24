@@ -3,6 +3,7 @@ package expo.modules.nothingglyph
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import com.nothing.ketchum.Common
 import com.nothing.ketchum.Glyph
@@ -18,8 +19,8 @@ class NothingGlyphModule : Module() {
 
   private var glyphManager: GlyphManager? = null
   private var isConnected = false
-  private var activeDeviceCode = "23111"
-  private var totalSegments = 26
+  private var activeDeviceCode = Glyph.DEVICE_24111
+  private var totalSegments = 36
   private var currentFrameBrightness = IntArray(36)
 
   override fun definition() = ModuleDefinition {
@@ -144,7 +145,13 @@ class NothingGlyphModule : Module() {
       }
 
       when (activeDeviceCode) {
-        "23111", "23113" -> {
+        "A059", Glyph.DEVICE_24111, "24111" -> {
+          // Phone (3a Pro): 36 channels (Arc 0: 0..19, Arc 1: 31..35, Arc 2: 20..30)
+          for (i in 0 until minOf(36, levels.size)) {
+            currentFrameBrightness[i] = (levels[i] * 255).toInt().coerceIn(0, 255)
+          }
+        }
+        "23111", "23113", "A142", "A142P" -> {
           // Phone 2a: 24 LEDs on right (0..23), 24 bottom-left, 25 top-left
           // Top-Left (virtual 0..19)
           var maxTop = 0.0
@@ -184,7 +191,8 @@ class NothingGlyphModule : Module() {
   private fun mapVirtualPixelToChannels(virtualPixel: Int): IntArray {
     val p = virtualPixel.coerceIn(0, 35)
     return when (activeDeviceCode) {
-      "23111", "23113" -> when {
+      "A059", Glyph.DEVICE_24111, "24111" -> intArrayOf(p.coerceIn(0, 35))
+      "23111", "23113", "A142", "A142P" -> when {
         // Top-Left (0..19)
         p in 0..19 -> intArrayOf(25)
         // Right Arc (20..30): 11 virtual positions mapped across 24 channels (0..23)
@@ -198,12 +206,11 @@ class NothingGlyphModule : Module() {
         p in 31..35 -> intArrayOf(24)
         else -> intArrayOf(0)
       }
-      "24111" -> intArrayOf(p.coerceIn(0, 35))
-      "22111" -> {
+      "22111", "A065", "AIN065" -> {
         val ch = (p * 33 / 36).coerceIn(0, 32)
         intArrayOf(ch)
       }
-      "20111" -> {
+      "20111", "A063" -> {
         val ch = (p * 16 / 36).coerceIn(0, 15)
         intArrayOf(ch)
       }
@@ -219,6 +226,13 @@ class NothingGlyphModule : Module() {
     detectDevice()
 
     try {
+      val debugEnabled = try {
+        Settings.Global.getInt(context.contentResolver, "nt_glyph_interface_debug_enable", 0)
+      } catch (e: Throwable) {
+        0
+      }
+      Log.i(TAG, "nt_glyph_interface_debug_enable: $debugEnabled")
+
       val manager = GlyphManager.getInstance(context.applicationContext)
       if (manager == null) {
         Log.e(TAG, "GlyphManager.getInstance() returned null")
@@ -252,6 +266,10 @@ class NothingGlyphModule : Module() {
     val is24111 = try { Common.is24111() } catch (e: Throwable) { false }
 
     when {
+      is24111 || model.contains("059") || model.contains("3a") || model.contains("phone (3)") -> {
+        activeDeviceCode = Glyph.DEVICE_24111
+        totalSegments = 36
+      }
       is23111 || model.contains("2a") || model.contains("a142") || model.contains("pacman") -> {
         activeDeviceCode = "23111"
         totalSegments = 26
@@ -264,13 +282,9 @@ class NothingGlyphModule : Module() {
         activeDeviceCode = "20111"
         totalSegments = 16
       }
-      is24111 || model.contains("059") || model.contains("3a") || model.contains("phone (3)") -> {
-        activeDeviceCode = "24111"
-        totalSegments = 36
-      }
       else -> {
-        activeDeviceCode = "23111"
-        totalSegments = 26
+        activeDeviceCode = Glyph.DEVICE_24111
+        totalSegments = 36
       }
     }
     Log.i(TAG, "Detected Nothing device: $activeDeviceCode ($totalSegments segments)")
@@ -280,16 +294,17 @@ class NothingGlyphModule : Module() {
     val manager = glyphManager ?: return
     val candidates = listOf(
       activeDeviceCode,
+      Glyph.DEVICE_24111,
+      "A059",
+      "24111",
       "A142",
       "A142P",
-      "A059",
       "A065",
       "AIN065",
       "A063",
       "A069",
       "23111",
       "23113",
-      "24111",
       "22111",
       "20111",
       "25111",
@@ -331,28 +346,34 @@ class NothingGlyphModule : Module() {
 
   private fun getArcChannels(arcIndex: Int): IntArray {
     return when (activeDeviceCode) {
-      "23111", "23113" -> when (arcIndex) {
-        0 -> intArrayOf(25)                 // Top-Left Arc (Channel 25)
-        1 -> intArrayOf(24)                 // Bottom-Left Arc (Channel 24)
-        2 -> (0..23).toList().toIntArray()  // Right Arc (Channels 0..23)
-        else -> intArrayOf()
-      }
-      "24111" -> when (arcIndex) {
+      "A059", Glyph.DEVICE_24111, "24111" -> when (arcIndex) {
         0 -> (0..19).toList().toIntArray()   // Top-Left (20 LEDs)
         1 -> (31..35).toList().toIntArray()  // Bottom-Left (5 LEDs)
         2 -> (20..30).toList().toIntArray()  // Right Arc (11 LEDs)
         else -> intArrayOf()
       }
-      "22111" -> when (arcIndex) {
+      "23111", "23113", "A142", "A142P" -> when (arcIndex) {
+        0 -> intArrayOf(25)                 // Top-Left Arc (Channel 25)
+        1 -> intArrayOf(24)                 // Bottom-Left Arc (Channel 24)
+        2 -> (0..23).toList().toIntArray()  // Right Arc (Channels 0..23)
+        else -> intArrayOf()
+      }
+      "22111", "A065", "AIN065" -> when (arcIndex) {
         0 -> (0..15).toList().toIntArray()
         1 -> (16..24).toList().toIntArray()
         2 -> (25..32).toList().toIntArray()
         else -> intArrayOf()
       }
-      else -> when (arcIndex) {
+      "20111", "A063" -> when (arcIndex) {
         0 -> intArrayOf(0, 1, 2)
         1 -> intArrayOf(3, 4)
-        2 -> (5 until totalSegments).toList().toIntArray()
+        2 -> (5 until 16).toList().toIntArray()
+        else -> intArrayOf()
+      }
+      else -> when (arcIndex) {
+        0 -> (0..19).toList().toIntArray()
+        1 -> (31..35).toList().toIntArray()
+        2 -> (20..30).toList().toIntArray()
         else -> intArrayOf()
       }
     }
