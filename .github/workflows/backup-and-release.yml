@@ -56,24 +56,38 @@ jobs:
         working-directory: expo-glyph-studio/android
         run: chmod +x gradlew
 
-      - name: Build Liquid Glass Studio APK
+      - name: Build Standalone Release APK with Bundled JavaScript
         working-directory: expo-glyph-studio/android
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
           EXIT_CODE=${PIPESTATUS[0]}
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "=== BUILD FAILED: last 100 lines ==="
+            echo "=== RELEASE BUILD FAILED: last 100 lines ==="
             tail -n 100 build.log
             exit $EXIT_CODE
           fi
 
-      - name: Locate APK
+      - name: Locate and Verify APK Bundle Contents
         id: find_apk
         run: |
-          APK=$(find expo-glyph-studio/android/app/build/outputs/apk -name "*.apk" | head -1)
+          APK=$(find expo-glyph-studio/android/app/build/outputs/apk -name "*release*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find expo-glyph-studio/android/app/build/outputs/apk -name "*.apk" | head -1)
+          fi
           echo "apk_path=$APK" >> $GITHUB_OUTPUT
           echo "Found APK: $APK"
           ls -lh "$APK"
+
+          echo "=== Verifying embedded assets & JS bundle inside APK ==="
+          unzip -l "$APK" | grep -E "index\.android\.bundle|assets/fonts" || true
+
+          if unzip -l "$APK" | grep -q "index.android.bundle"; then
+            echo "✅ VERIFIED: index.android.bundle is embedded in APK!"
+          else
+            echo "::error::index.android.bundle is MISSING from APK! App will fail on device!"
+            exit 1
+          fi
 
       - name: Prepare Release APKs
         run: |
@@ -91,18 +105,17 @@ jobs:
           tag_name: v2.0.${{ github.run_number }}
           name: "Nothing Glyph Studio v2.0.${{ github.run_number }}"
           body: |
-            ## 🌟 Nothing Glyph Studio — Liquid Glass UI
+            ## 🌟 Nothing Glyph Studio — Liquid Glass UI (Standalone Release)
 
-            ### ✅ Что работает:
-            - **Аппаратное управление глифами** через Ketchum SDK 2.0 (Nothing Phone 3a Pro — 36 каналов)
-            - **5 разделов**: КОНТРОЛЬ, АВТО-ОБХОД, СЕКВЕНСОР, МУЗЫКА, УТИЛИТЫ
-            - **Liquid Glass** дизайн — AMOLED чёрный, прозрачный таб-бар
-            - Навигация между разделами — исправлены баги с первым элементом
+            ### ✅ Что исправлено:
+            - **Встроен автономный JS-бандл (`index.android.bundle`)**: приложение больше НЕ требует запущенного Metro-сервера и запускается автономно без красного экрана ошибки.
+            - **Аппаратное управление глифами**: Ketchum SDK 2.0 (Nothing Phone 3a Pro — 36 каналов, код A059).
+            - **Liquid Glass интерфейс**: 5 экранов (КОНТРОЛЬ, АВТО-ОБХОД, СЕКВЕНСОР, МУЗЫКА, УТИЛИТЫ).
 
             ### 📱 Установка:
-            1. Скачайте `NothingGlyphStudio.apk`
-            2. Если Play Protect предупредит — нажмите **«Всё равно установить»**
-            3. Запустите — глифы загорятся при управлении ползунками
+            1. Удалите старую версию с телефона.
+            2. Скачайте `NothingGlyphStudio.apk`.
+            3. Установите и запустите — приложение загрузится сразу.
           files: release-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
