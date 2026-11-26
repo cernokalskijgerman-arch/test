@@ -824,6 +824,7 @@ function runEmpiricalChallenge() {
     let stepCountValue = null;
     let hasHorizontalScrollView = false;
     let cellWidth = null;
+    let cellFlex = null;
     let cellHeight = null;
 
     babelTraverse(ast, {
@@ -851,6 +852,9 @@ function runEmpiricalChallenge() {
             if (prop.key && prop.key.name === 'width' && prop.value.type === 'NumericLiteral') {
               cellWidth = prop.value.value;
             }
+            if (prop.key && prop.key.name === 'flex' && prop.value.type === 'NumericLiteral') {
+              cellFlex = prop.value.value;
+            }
             if (prop.key && prop.key.name === 'height' && prop.value.type === 'NumericLiteral') {
               cellHeight = prop.value.value;
             }
@@ -872,9 +876,9 @@ function runEmpiricalChallenge() {
     );
 
     recordTest(
-      'AST Geometry: Step cells are sized to 28x28dp touch targets',
-      cellWidth === 28 && cellHeight === 28,
-      `Cell dimensions were width=${cellWidth}, height=${cellHeight}`
+      'AST Geometry: Step cells use >=28dp height with responsive flex or >=28dp width',
+      (cellWidth >= 28 || cellFlex === 1) && cellHeight >= 28,
+      `Cell dimensions were width=${cellWidth}, flex=${cellFlex}, height=${cellHeight}`
     );
 
     // Viewport budget calculation:

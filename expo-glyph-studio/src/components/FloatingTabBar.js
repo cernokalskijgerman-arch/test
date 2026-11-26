@@ -19,9 +19,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SlidersHorizontal,
-  Cpu,
-  Layers,
-  Radio,
+  Orbit,
+  LayoutGrid,
+  AudioLines,
   Wrench,
 } from 'lucide-react-native';
 
@@ -31,17 +31,30 @@ const BAR_RADIUS = 32;
 const PILL_INSET = 6;
 
 const DEFAULT_ICONS = [
-  SlidersHorizontal, // Tab 0: КОНТРОЛЬ
-  Cpu,               // Tab 1: ПИКСЕЛИ
-  Layers,            // Tab 2: СЕКВЕНСОР
-  Radio,             // Tab 3: МУЗЫКА
-  Wrench,            // Tab 4: УТИЛИТЫ
+  SlidersHorizontal,
+  Orbit || SlidersHorizontal,
+  LayoutGrid || SlidersHorizontal,
+  AudioLines || SlidersHorizontal,
+  Wrench,
 ];
+
+const COMPACT_TAB_LABELS = {
+  0: 'КОНТРОЛЬ',
+  1: 'ОБХОД',
+  2: 'РИТМ',
+  3: 'МУЗЫКА',
+  4: 'УТИЛИТЫ',
+};
+
+const COMPACT_LABEL_BY_RAW = {
+  'АВТО-ОБХОД': 'ОБХОД',
+  'СЕКВЕНСОР': 'РИТМ',
+};
 
 /**
  * Floating Glassmorphic Tab Bar with Liquid Glass refraction,
- * dynamic sliding indicator pill, tactile spring compression,
- * safe area insets, and iOS-style re-tap category switching.
+ * dynamic sliding indicator pill, smooth 1:1 press-and-drag scrubbing across tabs,
+ * always-visible compact tab labels, and non-blocking pointer layers.
  */
 export function FloatingTabBar({
   tabs = [],
@@ -62,28 +75,22 @@ export function FloatingTabBar({
   const activeIndex = state ? state.index : currentTab;
   const tabCount = routes.length || 1;
 
-  const INNER_WIDTH = containerWidth - 2;
+  const INNER_WIDTH = Math.max(1, containerWidth - 2);
   const TAB_WIDTH = INNER_WIDTH / tabCount;
 
-  // Animated sliding pill position using Reanimated spring physics
+  // Animated sliding pill position & scrub scale feedback
   const translateX = useSharedValue(activeIndex * TAB_WIDTH);
-
-  useEffect(() => {
-    translateX.value = withSpring(activeIndex * TAB_WIDTH, {
-      mass: 0.6,
-      damping: 18,
-      stiffness: 180,
-      overshootClamping: false,
-    });
-  }, [activeIndex, TAB_WIDTH]);
-
-  const indicatorAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const scrubActive = useSharedValue(0);
 
   // Synchronized refs for live state & props to eliminate stale closures
   const activeIndexRef = useRef(activeIndex);
   activeIndexRef.current = activeIndex;
+
+  const lastActiveIndexRef = useRef(activeIndex);
+  const isScrubbingRef = useRef(false);
+  if (!isScrubbingRef.current) {
+    lastActiveIndexRef.current = activeIndex;
+  }
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -94,25 +101,53 @@ export function FloatingTabBar({
   const onSelectTabRef = useRef(onSelectTab);
   onSelectTabRef.current = onSelectTab;
 
-  const routesRef = useRef(routes);
-  routesRef.current = routes;
+  const widthRef = useRef(INNER_WIDTH);
+  widthRef.current = INNER_WIDTH;
 
-  const lastActiveIndexRef = useRef(activeIndex);
-  lastActiveIndexRef.current = activeIndex;
+  const tabWidthRef = useRef(TAB_WIDTH);
+  tabWidthRef.current = TAB_WIDTH;
 
-  const handlePress = useCallback((index) => {
-    const currentActive = activeIndexRef.current;
+  const tabCountRef = useRef(tabCount);
+  tabCountRef.current = tabCount;
 
-    if (currentActive === index) {
-      // Re-tap on active tab: safely do nothing, never open unwanted popup modals
-      return;
+  const barRef = useRef(null);
+  const barWindowXRef = useRef(null);
+  const barWindowWidthRef = useRef(INNER_WIDTH);
+  const touchStartTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!isScrubbingRef.current) {
+      translateX.value = withSpring(activeIndex * TAB_WIDTH, {
+        mass: 0.6,
+        damping: 18,
+        stiffness: 180,
+        overshootClamping: false,
+      });
     }
+  }, [activeIndex, TAB_WIDTH, translateX]);
 
-    lastActiveIndexRef.current = index;
+  const indicatorAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { scale: 1 + scrubActive.value * 0.04 },
+    ],
+  }));
 
-    // Light tactile feedback on tab switch
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  const measureBarWindow = useCallback(() => {
+    const node = barRef.current;
+    if (node && typeof node.measureInWindow === 'function') {
+      node.measureInWindow((wx, _wy, ww) => {
+        if (typeof wx === 'number' && !Number.isNaN(wx)) {
+          barWindowXRef.current = wx;
+        }
+        if (typeof ww === 'number' && ww > 0) {
+          barWindowWidthRef.current = ww;
+        }
+      });
+    }
+  }, []);
 
+  const dispatchTabSelect = useCallback((index) => {
     const nav = navigationRef.current;
     const st = stateRef.current;
     const onSelect = onSelectTabRef.current;
@@ -134,56 +169,110 @@ export function FloatingTabBar({
     }
   }, []);
 
-  // Real-time Scrubbing / Drag-to-Select (Зажатие и наведение на нужный пункт)
-  const widthRef = useRef(INNER_WIDTH);
-  widthRef.current = INNER_WIDTH;
+  const handlePress = useCallback((index) => {
+    if (activeIndexRef.current === index) {
+      return;
+    }
+    lastActiveIndexRef.current = index;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    dispatchTabSelect(index);
+  }, [dispatchTabSelect]);
 
-  const tabCountRef = useRef(tabCount);
-  tabCountRef.current = tabCount;
-
-  const isScrubbingRef = useRef(false);
-
-  const calculateIndexFromLocation = useCallback((x) => {
-    const w = widthRef.current > 0 ? widthRef.current : (width - paddingHorizontal * 2 - 2);
+  const processScrubEvent = useCallback((evt) => {
+    const fallbackW = widthRef.current > 0 ? widthRef.current : (width - paddingHorizontal * 2 - 2);
+    const barW = barWindowWidthRef.current > 0 ? barWindowWidthRef.current : fallbackW;
     const count = tabCountRef.current || 5;
-    const tabW = w / count;
-    const idx = Math.floor(x / tabW);
-    return Math.max(0, Math.min(count - 1, idx));
-  }, [paddingHorizontal]);
+    const tabW = barW / count;
+    const pageX = evt?.nativeEvent?.pageX;
+
+    let relX;
+    if (barWindowXRef.current !== null && typeof pageX === 'number' && !Number.isNaN(pageX)) {
+      relX = pageX - barWindowXRef.current;
+    } else if (typeof evt?.nativeEvent?.locationX === 'number') {
+      relX = evt.nativeEvent.locationX;
+    } else {
+      relX = (activeIndexRef.current + 0.5) * tabW;
+    }
+
+    const clampedX = Math.max(0, Math.min(barW, relX));
+    const target = Math.max(0, Math.min(count - 1, Math.floor(clampedX / tabW)));
+
+    // Direct 1:1 pill tracking with subtle magnetic blend during active scrub (no per-frame spring spawn)
+    const pillTabW = tabWidthRef.current > 0 ? tabWidthRef.current : tabW;
+    const freeX = Math.max(0, Math.min((count - 1) * pillTabW, clampedX - pillTabW / 2));
+    const magnetX = target * pillTabW;
+    const targetPillX = freeX * 0.65 + magnetX * 0.35;
+
+    translateX.value = targetPillX;
+
+    if (target !== lastActiveIndexRef.current) {
+      lastActiveIndexRef.current = target;
+      Haptics.selectionAsync().catch(() => {});
+      dispatchTabSelect(target);
+    }
+  }, [dispatchTabSelect, paddingHorizontal, translateX]);
+
+  const finishScrub = useCallback(() => {
+    isScrubbingRef.current = false;
+    scrubActive.value = withSpring(0, {
+      mass: 0.4,
+      damping: 16,
+      stiffness: 260,
+    });
+    const finalIdx = lastActiveIndexRef.current;
+    const pillTabW = tabWidthRef.current > 0 ? tabWidthRef.current : (widthRef.current / (tabCountRef.current || 5));
+    translateX.value = withSpring(finalIdx * pillTabW, {
+      mass: 0.6,
+      damping: 18,
+      stiffness: 180,
+      overshootClamping: false,
+    });
+  }, [scrubActive, translateX]);
 
   const scrubResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
+      onStartShouldSetPanResponderCapture: () => {
+        touchStartTimeRef.current = Date.now();
+        measureBarWindow();
+        return false;
       },
+      onMoveShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10;
+        const absDx = Math.abs(gestureState.dx);
+        const absDy = Math.abs(gestureState.dy);
+        const heldMs = Date.now() - touchStartTimeRef.current;
+        if (absDx > 6 && absDx >= absDy * 0.9) return true;
+        if (heldMs > 160 && absDx > 3 && absDx >= absDy * 0.7) return true;
+        return false;
       },
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
         isScrubbingRef.current = true;
-        const x = evt.nativeEvent.locationX;
-        const target = calculateIndexFromLocation(x);
-        if (target !== activeIndexRef.current && target !== lastActiveIndexRef.current) {
-          lastActiveIndexRef.current = target;
-          handlePress(target);
-        }
+        scrubActive.value = withSpring(1, {
+          mass: 0.3,
+          damping: 16,
+          stiffness: 300,
+        });
+        measureBarWindow();
+        processScrubEvent(evt);
       },
-      onPanResponderMove: (evt, gestureState) => {
-        isScrubbingRef.current = true;
-        const x = evt.nativeEvent.locationX;
-        const target = calculateIndexFromLocation(x);
-        if (target !== activeIndexRef.current && target !== lastActiveIndexRef.current) {
-          lastActiveIndexRef.current = target;
-          handlePress(target);
+      onPanResponderMove: (evt) => {
+        if (!isScrubbingRef.current) {
+          isScrubbingRef.current = true;
+          scrubActive.value = withSpring(1, {
+            mass: 0.3,
+            damping: 16,
+            stiffness: 300,
+          });
         }
+        processScrubEvent(evt);
       },
       onPanResponderRelease: () => {
-        isScrubbingRef.current = false;
+        finishScrub();
       },
       onPanResponderTerminate: () => {
-        isScrubbingRef.current = false;
+        finishScrub();
       },
     })
   ).current;
@@ -192,7 +281,7 @@ export function FloatingTabBar({
     ? Math.max(insets?.bottom || 0, 16) + 4
     : Math.max(insets?.bottom || 0, 12) + 8;
 
-  const inactiveColor = 'rgba(160, 165, 185, 0.65)';
+  const inactiveColor = 'rgba(210, 215, 230, 0.72)';
 
   return (
     <View
@@ -226,106 +315,119 @@ export function FloatingTabBar({
             backgroundColor: 'rgba(14, 16, 24, 0.68)',
           },
         ]}
-        {...scrubResponder.panHandlers}
       >
-        {/* Specular physical reflection gradient sheen */}
-        <LinearGradient
-          colors={[
-            'rgba(255, 255, 255, 0.22)',
-            'rgba(255, 255, 255, 0.02)',
-            'rgba(0, 0, 0, 0.42)',
-          ]}
-          locations={[0, 0.45, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
-
-        {/* Top edge chamfered specular rim highlight */}
-        <View pointerEvents="none" style={styles.topRimHighlight} />
-
-        {/* Sliding Liquid Glass Pill Indicator */}
-        <Animated.View
-          style={[styles.pillWrapper, { width: TAB_WIDTH }, indicatorAnimStyle]}
-          pointerEvents="none"
+        <View
+          ref={barRef}
+          collapsable={false}
+          style={styles.barInner}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0) {
+              barWindowWidthRef.current = w;
+            }
+            measureBarWindow();
+          }}
+          {...scrubResponder.panHandlers}
         >
-          <View
-            style={[
-              styles.pill,
-              {
-                backgroundColor: 'rgba(255, 255, 255, 0.14)',
-                borderColor: 'rgba(255, 255, 255, 0.38)',
-                shadowColor: '#FFFFFF',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.28,
-                shadowRadius: 10,
-                elevation: 4,
-              },
+          {/* Specular physical reflection gradient sheen */}
+          <LinearGradient
+            colors={[
+              'rgba(255, 255, 255, 0.22)',
+              'rgba(255, 255, 255, 0.02)',
+              'rgba(0, 0, 0, 0.42)',
             ]}
+            locations={[0, 0.45, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+
+          {/* Top edge chamfered specular rim highlight */}
+          <View pointerEvents="none" style={styles.topRimHighlight} />
+
+          {/* Sliding Liquid Glass Pill Indicator */}
+          <Animated.View
+            style={[styles.pillWrapper, { width: TAB_WIDTH }, indicatorAnimStyle]}
+            pointerEvents="none"
           >
-            {/* Specular gradient inside pill */}
-            <LinearGradient
-              colors={[
-                'rgba(255, 255, 255, 0.32)',
-                'rgba(255, 255, 255, 0.08)',
-                'transparent',
+            <View
+              pointerEvents="none"
+              style={[
+                styles.pill,
+                {
+                  backgroundColor: 'rgba(255, 255, 255, 0.14)',
+                  borderColor: 'rgba(255, 255, 255, 0.38)',
+                  shadowColor: '#FFFFFF',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.28,
+                  shadowRadius: 10,
+                },
               ]}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Top specular highlight edge */}
-            <View style={styles.pillTopRim} />
-          </View>
-        </Animated.View>
-
-        {/* Tab Item Buttons */}
-        {routes.map((route, index) => {
-          const isFocused = activeIndex === index;
-          const color = isFocused ? activeColor : inactiveColor;
-          const label = route.label || (descriptors && descriptors[route.key]?.options?.title) || route.name;
-          const IconComponent = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
-
-          return (
-            <Pressable
-              key={route.id !== undefined ? route.id : (route.key || index)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isFocused }}
-              accessibilityLabel={label}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              onPress={() => handlePress(index)}
-              style={[styles.tab, { width: TAB_WIDTH }]}
             >
-              <TabItem
-                isFocused={isFocused}
-                color={color}
-                label={label}
-                IconComponent={IconComponent}
-                tabWidth={TAB_WIDTH}
+              {/* Specular gradient inside pill */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={[
+                  'rgba(255, 255, 255, 0.32)',
+                  'rgba(255, 255, 255, 0.08)',
+                  'transparent',
+                ]}
+                style={StyleSheet.absoluteFill}
               />
-            </Pressable>
-          );
-        })}
+              {/* Top specular highlight edge */}
+              <View pointerEvents="none" style={styles.pillTopRim} />
+            </View>
+          </Animated.View>
+
+          {/* Tab Item Buttons */}
+          {routes.map((route, index) => {
+            const isFocused = activeIndex === index;
+            const color = isFocused ? activeColor : inactiveColor;
+            const rawLabel = route.label || (descriptors && descriptors[route.key]?.options?.title) || route.name;
+            const label = COMPACT_TAB_LABELS[index] || COMPACT_LABEL_BY_RAW[rawLabel] || rawLabel;
+            const IconComponent = DEFAULT_ICONS[index % DEFAULT_ICONS.length];
+
+            return (
+              <Pressable
+                key={route.id !== undefined ? route.id : (route.key || index)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={rawLabel || label}
+                hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+                onPress={() => handlePress(index)}
+                style={[styles.tab, { width: TAB_WIDTH }]}
+              >
+                <TabItem
+                  isFocused={isFocused}
+                  color={color}
+                  label={label}
+                  IconComponent={IconComponent}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </BlurView>
     </View>
   );
 }
 
-function TabItem({
+const TabItem = React.memo(function TabItem({
   isFocused,
   color,
   label,
   IconComponent,
-  tabWidth,
 }) {
-  const iconScale = useSharedValue(isFocused ? 1.0 : 0.85);
+  const iconScale = useSharedValue(isFocused ? 1.0 : 0.9);
 
   useEffect(() => {
-    iconScale.value = withSpring(isFocused ? 1.0 : 0.85, {
+    iconScale.value = withSpring(isFocused ? 1.0 : 0.9, {
       mass: 0.5,
       damping: 12,
       stiffness: 200,
     });
-  }, [isFocused]);
+  }, [isFocused, iconScale]);
 
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: iconScale.value }],
@@ -336,24 +438,29 @@ function TabItem({
       pointerEvents="none"
       style={styles.tabContent}
     >
-      <Animated.View style={iconAnimStyle}>
+      <Animated.View style={iconAnimStyle} pointerEvents="none">
         {IconComponent && (
           <IconComponent
             color={color}
             size={isFocused ? 20 : 18}
-            strokeWidth={isFocused ? 2.4 : 1.8}
+            strokeWidth={isFocused ? 2.3 : 1.8}
           />
         )}
       </Animated.View>
 
-      {isFocused && label && (
-        <Text numberOfLines={1} style={[styles.label, { color }]}>
+      {Boolean(label) && (
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          style={[styles.label, { color }]}
+        >
           {label}
         </Text>
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   outerWrapper: {
@@ -364,8 +471,13 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     borderRadius: BAR_RADIUS,
     overflow: 'hidden',
+  },
+  barInner: {
+    flex: 1,
+    height: BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
   },
   topRimHighlight: {
     position: 'absolute',
@@ -381,7 +493,6 @@ const styles = StyleSheet.create({
     top: PILL_INSET,
     bottom: PILL_INSET,
     zIndex: 1,
-    elevation: 1,
     paddingHorizontal: PILL_INSET,
   },
   pill: {
@@ -402,21 +513,23 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2,
-    elevation: 2,
+    paddingHorizontal: 2,
+    zIndex: 5,
+    elevation: 5,
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
+    width: '100%',
   },
   label: {
     fontFamily: 'NDOT57',
     fontSize: 8.5,
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     marginTop: 1,
-    color: '#FFFFFF',
+    textAlign: 'center',
   },
 });
 
-export default FloatingTabBar;
+export default React.memo(FloatingTabBar);

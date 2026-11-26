@@ -20,10 +20,12 @@ export const GlyphColors = {
   neonCyan: '#00E5FF',
   cyanGlow: 'rgba(0, 229, 255, 0.35)',
 
-  // Typography
+  // Typography (WCAG AA compliant on translucent dark glass)
   textWhite: '#FFFFFF',
-  textMuted: '#8E8E93',
-  textDim: '#48484A',
+  textSecondary: '#B2B2C2',
+  textTertiary: '#9A9AA8',
+  textMuted: '#9A9AA6',
+  textDim: '#7A7A8C',
 
   // iOS-style Liquid Glass Borders & Surfaces
   glassBorder: 'rgba(255, 255, 255, 0.16)',

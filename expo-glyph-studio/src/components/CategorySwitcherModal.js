@@ -7,16 +7,33 @@ import {
   TouchableWithoutFeedback,
   Animated,
   Platform,
+  PanResponder,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import {
+  SlidersHorizontal,
+  Orbit,
+  LayoutGrid,
+  AudioLines,
+  Wrench,
+} from 'lucide-react-native';
 import LiquidGlassCard from './LiquidGlassCard';
+import { GlyphColors } from '../theme/colors';
+
+const CATEGORY_ICONS = [
+  SlidersHorizontal,
+  Orbit,
+  LayoutGrid,
+  AudioLines,
+  Wrench,
+];
 
 /**
  * iOS-style Liquid Glass Category Switcher Bottom Sheet.
  * Implemented as an in-tree overlay to guarantee 100% crash-free,
- * freeze-free operation across Android and iOS in Expo Go (no OS Dialog Window collisions).
+ * freeze-free operation across Android and iOS (no OS Dialog Window collisions).
  */
 export default function CategorySwitcherModal({
   visible,
@@ -29,6 +46,41 @@ export default function CategorySwitcherModal({
   const [shouldRender, setShouldRender] = React.useState(visible);
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) {
+          slideAnim.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 75 || gs.vy > 0.6) {
+          Haptics.selectionAsync().catch(() => {});
+          onCloseRef.current?.();
+        } else {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 120,
+            friction: 14,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 120,
+          friction: 14,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible) {
@@ -62,7 +114,7 @@ export default function CategorySwitcherModal({
         setShouldRender(false);
       });
     }
-  }, [visible]);
+  }, [visible, shouldRender, fadeAnim, slideAnim]);
 
   if (!shouldRender) return null;
 
@@ -73,7 +125,7 @@ export default function CategorySwitcherModal({
   };
 
   return (
-    <View style={styles.overlayRoot} pointerEvents={visible ? "auto" : "none"}>
+    <View style={styles.overlayRoot} pointerEvents={visible ? 'auto' : 'none'}>
       {/* Blurred Backdrop */}
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
@@ -118,20 +170,28 @@ export default function CategorySwitcherModal({
         {/* Top edge chamfered specular rim highlight */}
         <View pointerEvents="none" style={styles.topRimHighlight} />
 
-        {/* Grab Handle */}
-        <View style={styles.handleContainer}>
-          <View style={styles.handleBar} />
-        </View>
-
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.sheetTitle}>ПЕРЕКЛЮЧЕНИЕ КАТЕГОРИЙ</Text>
-            <Text style={styles.sheetSubtitle}>Быстрый переход между разделами</Text>
+        {/* Drag-to-close Grab Handle & Header */}
+        <View {...sheetPanResponder.panHandlers}>
+          <View style={styles.handleContainer}>
+            <View style={styles.handleBar} />
           </View>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
+
+          <View style={styles.headerRow}>
+            <View style={styles.titleBlock}>
+              <Text style={styles.sheetTitle}>ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ</Text>
+              <Text style={styles.sheetSubtitle}>Быстрый переход между режимами</Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Закрыть меню разделов"
+              style={styles.closeBtn}
+              onPress={onClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Category Cards List */}
@@ -139,33 +199,40 @@ export default function CategorySwitcherModal({
           {categories.map((cat) => {
             const isActive = currentTab === cat.id;
             const catStat = stats[cat.id];
+            const IconComponent = CATEGORY_ICONS[cat.id % CATEGORY_ICONS.length];
 
             return (
               <LiquidGlassCard
                 key={cat.id}
+                compact={true}
                 isActive={isActive}
                 onPress={() => handleSelect(cat.id)}
                 style={styles.categoryCard}
               >
                 <View style={styles.categoryRow}>
                   <View style={styles.categoryLeft}>
-                    {/* Active indicator dot */}
-                    <View
-                      style={[
-                        styles.categoryDot,
-                        isActive && styles.categoryDotActive,
-                      ]}
-                    />
-                    <View>
+                    <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                      {IconComponent && (
+                        <IconComponent
+                          size={16}
+                          color={isActive ? '#FFFFFF' : GlyphColors.textSecondary}
+                          strokeWidth={isActive ? 2.3 : 1.8}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.categoryTextWrap}>
                       <Text
                         style={[
                           styles.categoryLabel,
                           isActive && styles.categoryLabelActive,
                         ]}
+                        numberOfLines={1}
                       >
                         {cat.label}
                       </Text>
-                      <Text style={styles.categoryDesc}>{cat.subtitle}</Text>
+                      <Text style={styles.categoryDesc} numberOfLines={1}>
+                        {cat.subtitle}
+                      </Text>
                     </View>
                   </View>
 
@@ -181,6 +248,7 @@ export default function CategorySwitcherModal({
                         styles.statPillText,
                         isActive && styles.statPillTextActive,
                       ]}
+                      numberOfLines={1}
                     >
                       {catStat || (isActive ? 'АКТИВЕН' : 'ОТКРЫТЬ')}
                     </Text>
@@ -206,11 +274,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   sheetContainer: {
-    backgroundColor: 'rgba(14, 16, 24, 0.85)',
+    backgroundColor: 'rgba(14, 16, 24, 0.88)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
     overflow: 'hidden',
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -240,10 +308,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   handleBar: {
-    width: 38,
+    width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.30)',
+    backgroundColor: 'rgba(255, 255, 255, 0.36)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -251,32 +319,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginVertical: 8,
   },
+  titleBlock: {
+    flex: 1,
+    paddingRight: 8,
+  },
   sheetTitle: {
     fontFamily: 'NDOT57',
     fontSize: 12,
     color: '#FFFFFF',
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
   },
   sheetSubtitle: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
-    color: '#8E8E98',
+    fontSize: 9.5,
+    color: GlyphColors.textTertiary,
     marginTop: 2,
   },
   closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.20)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 13,
   },
   cardsList: {
     gap: 6,
@@ -289,62 +360,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 3,
   },
   categoryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingRight: 8,
   },
-  categoryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#404050',
+  iconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 10,
   },
-  categoryDotActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowRadius: 6,
-    shadowOpacity: 1,
+  iconBoxActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.48)',
+  },
+  categoryTextWrap: {
+    flex: 1,
   },
   categoryLabel: {
     fontFamily: 'NDOT57',
     fontSize: 11,
-    color: '#B0B0C0',
-    letterSpacing: 1.2,
+    color: '#D2D2DF',
+    letterSpacing: 1.1,
   },
   categoryLabelActive: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   categoryDesc: {
     fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#656575',
-    marginTop: 1,
+    fontSize: 9,
+    color: GlyphColors.textTertiary,
+    marginTop: 2,
     letterSpacing: 0.4,
   },
   statPill: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   statPillActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    borderColor: 'rgba(255, 255, 255, 0.60)',
+    borderColor: 'rgba(255, 255, 255, 0.65)',
   },
   statPillText: {
     fontFamily: 'NDOT57',
-    fontSize: 7.5,
-    color: '#707080',
-    letterSpacing: 0.8,
+    fontSize: 8.5,
+    color: GlyphColors.textSecondary,
+    letterSpacing: 0.7,
   },
   statPillTextActive: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
   },
 });

@@ -5,6 +5,10 @@
     <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
     <uses-permission android:name="com.nothing.glyph.permission.GLYPH" />
 
+    <!-- Real-time Audio Capture & System Visualizer Mix Permissions -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!-- Nothing OS Package Visibility queries for IPC Service Binding -->
     <queries>
         <package android:name="com.nothing.thirdparty" />

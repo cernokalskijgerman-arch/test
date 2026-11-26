@@ -7,6 +7,21 @@ try {
   // Graceful fallback for web/Expo Go simulator without native Ketchum binary
 }
 
+const createEmptyAudioMetrics = () => ({
+  active: false,
+  hasPermission: false,
+  source: 'none',
+  mixActive: false,
+  signalDetected: false,
+  bass: 0,
+  mid: 0,
+  treble: 0,
+  rms: 0,
+  flux: 0,
+  peakDb: -96,
+  bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+});
+
 export const NothingGlyph = {
   initHardware: () => {
     try {
@@ -27,6 +42,71 @@ export const NothingGlyph = {
       return NothingGlyphNative?.getDeviceModel?.() ?? null;
     } catch (e) {
       return null;
+    }
+  },
+  getHardwareStatus: () => {
+    try {
+      return NothingGlyphNative?.getHardwareStatus?.() ?? null;
+    } catch (e) {
+      return null;
+    }
+  },
+  getBatteryInfo: () => {
+    try {
+      return NothingGlyphNative?.getBatteryInfo?.() ?? null;
+    } catch (e) {
+      return null;
+    }
+  },
+  hasAudioPermission: () => {
+    try {
+      return Boolean(NothingGlyphNative?.hasAudioPermission?.());
+    } catch (e) {
+      return false;
+    }
+  },
+  requestAudioPermission: async () => {
+    try {
+      if (NothingGlyphNative?.requestAudioPermission) {
+        return await NothingGlyphNative.requestAudioPermission();
+      }
+      return { granted: false, status: 'unavailable', canAskAgain: false };
+    } catch (e) {
+      return { granted: false, status: 'denied', canAskAgain: false };
+    }
+  },
+  startAudioCapture: (sourceMode = 'auto') => {
+    try {
+      const mode = typeof sourceMode === 'string' && sourceMode.length > 0 ? sourceMode : 'auto';
+      return (
+        NothingGlyphNative?.startAudioCapture?.(mode) ?? {
+          started: false,
+          activeSource: 'none',
+          hasPermission: false,
+          mixSupported: false,
+          error: 'Native audio module unavailable',
+        }
+      );
+    } catch (e) {
+      return {
+        started: false,
+        activeSource: 'none',
+        hasPermission: false,
+        mixSupported: false,
+        error: e?.message || 'startAudioCapture failed',
+      };
+    }
+  },
+  stopAudioCapture: () => {
+    try {
+      NothingGlyphNative?.stopAudioCapture?.();
+    } catch (e) {}
+  },
+  getAudioMetrics: () => {
+    try {
+      return NothingGlyphNative?.getAudioMetrics?.() ?? createEmptyAudioMetrics();
+    } catch (e) {
+      return createEmptyAudioMetrics();
     }
   },
   turnOff: () => {
@@ -84,6 +164,13 @@ export const {
   initHardware,
   isConnected,
   getDeviceModel,
+  getHardwareStatus,
+  getBatteryInfo,
+  hasAudioPermission,
+  requestAudioPermission,
+  startAudioCapture,
+  stopAudioCapture,
+  getAudioMetrics,
   turnOff,
   setBrightness,
   setChannel,

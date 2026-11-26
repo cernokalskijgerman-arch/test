@@ -67,15 +67,15 @@ runTest('Channel allocation constants match device specifications', () => {
     'A142': 26,  // Phone (2a)
     '22111': 33, // Phone (2)
     'A065': 33,  // Phone (2)
-    '20111': 16, // Phone (1)
-    'A063': 16,  // Phone (1)
+    '20111': 15, // Phone (1)
+    'A063': 15,  // Phone (1)
   };
 
   assert.strictEqual(DEVICE_CHANNELS['24111'], 36);
   assert.strictEqual(DEVICE_CHANNELS['A059'], 36);
   assert.strictEqual(DEVICE_CHANNELS['23111'], 26);
   assert.strictEqual(DEVICE_CHANNELS['22111'], 33);
-  assert.strictEqual(DEVICE_CHANNELS['20111'], 16);
+  assert.strictEqual(DEVICE_CHANNELS['20111'], 15);
 });
 
 // -----------------------------------------------------------------------------
@@ -100,7 +100,7 @@ function detectDevice(modelString, flags = {}) {
     return { activeDeviceCode: '22111', totalSegments: 33 };
   }
   if (is20111 || model.includes('063') || model.includes('spacewar') || model.includes('phone (1)')) {
-    return { activeDeviceCode: '20111', totalSegments: 16 };
+    return { activeDeviceCode: '20111', totalSegments: 15 };
   }
   return { activeDeviceCode: 'A059', totalSegments: 36 };
 }
@@ -139,10 +139,10 @@ runTest('detectDevice correctly identifies Phone (2) as 33 channels', () => {
   assert.strictEqual(d.totalSegments, 33);
 });
 
-runTest('detectDevice correctly identifies Phone (1) as 16 channels', () => {
+runTest('detectDevice correctly identifies Phone (1) as 15 channels', () => {
   const d = detectDevice('Nothing Phone (1)');
   assert.strictEqual(d.activeDeviceCode, '20111');
-  assert.strictEqual(d.totalSegments, 16);
+  assert.strictEqual(d.totalSegments, 15);
 });
 
 // -----------------------------------------------------------------------------

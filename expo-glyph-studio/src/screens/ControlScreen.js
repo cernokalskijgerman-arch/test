@@ -9,11 +9,12 @@ import {
 import * as Haptics from 'expo-haptics';
 import LiquidGlassCard from '../components/LiquidGlassCard';
 import GlyphSlider from '../components/GlyphSlider';
+import { GlyphColors } from '../theme/colors';
 
 /**
  * Screen 1: «КОНТРОЛЬ»
  * Master Power, Master Brightness, Individual Arc Dimmers.
- * Compact layout optimized for zero vertical scrolling.
+ * Compact layout optimized for zero vertical scrolling on >= 780dp screens.
  */
 export default function ControlScreen({
   brightness = [255, 255, 255],
@@ -25,6 +26,7 @@ export default function ControlScreen({
   onAllOff,
 }) {
   const isMasterOn = masterBrightness > 0 && brightness.some((b) => b > 0);
+  const isMasterZero = masterBrightness === 0;
 
   const handleToggleMaster = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -57,25 +59,28 @@ export default function ControlScreen({
       {/* ============================================================ */}
       {/* 1. MASTER POWER & MASTER BRIGHTNESS                          */}
       {/* ============================================================ */}
-      <LiquidGlassCard compact={true}>
+      <LiquidGlassCard compact={true} isActive={isMasterOn}>
         <View style={styles.masterRow}>
           <View style={styles.masterTitleRow}>
             <View style={[styles.statusDot, isMasterOn && styles.statusDotActive]} />
-            <Text style={styles.masterTitle}>
+            <Text style={styles.masterTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {isMasterOn
                 ? `ГЛИФ: ВКЛ (${Math.round((masterBrightness / 255) * 100)}%)`
-                : 'ГЛИФ: ОТКЛЮЧЕН'}
+                : 'ГЛИФ: ВЫКЛ (0%)'}
             </Text>
           </View>
 
           <TouchableOpacity
+            accessibilityRole="switch"
+            accessibilityState={{ checked: isMasterOn }}
+            accessibilityLabel="Общее питание глифов"
             style={[styles.masterBtn, isMasterOn && styles.masterBtnActive]}
             onPress={handleToggleMaster}
             activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.masterBtnText, isMasterOn && styles.masterBtnTextActive]}>
-              {isMasterOn ? 'ОТКЛ' : 'ВКЛ'}
+              {isMasterOn ? 'ВКЛ' : 'ВЫКЛ'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -116,6 +121,8 @@ export default function ControlScreen({
             return (
               <TouchableOpacity
                 key={item.label}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
                 style={[styles.presetBtn, isSelected && styles.presetBtnActive]}
                 onPress={() => setBrightnessPreset(item.val)}
                 activeOpacity={0.7}
@@ -140,14 +147,23 @@ export default function ControlScreen({
       {/* ============================================================ */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionHeader}>ДУГИ СВЕЧЕНИЯ NOTHING</Text>
+        {isMasterZero && (
+          <View style={styles.masterZeroBadge}>
+            <Text style={styles.masterZeroBadgeText}>МАСТЕР 0%</Text>
+          </View>
+        )}
       </View>
 
       {/* ARC 0: TOP-LEFT */}
-      <LiquidGlassCard compact={true} isActive={brightness[0] > 10}>
+      <LiquidGlassCard
+        compact={true}
+        isActive={brightness[0] > 0 && !isMasterZero}
+        style={isMasterZero ? styles.arcCardDimmed : undefined}
+      >
         <View style={styles.arcCardHeader}>
           <View style={styles.arcInfo}>
             <View
-              style={[styles.arcDot, brightness[0] > 10 && styles.arcDotActive]}
+              style={[styles.arcDot, brightness[0] > 0 && styles.arcDotActive]}
             />
             <Text style={styles.arcTitle}>ВЕРХ-ЛЕВО (20 LED)</Text>
             <Text
@@ -160,18 +176,20 @@ export default function ControlScreen({
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.arcToggleBtn, brightness[0] > 10 && styles.arcToggleBtnActive]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: brightness[0] > 0 }}
+            style={[styles.arcToggleBtn, brightness[0] > 0 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(0)}
             activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text
               style={[
                 styles.arcToggleText,
-                brightness[0] > 10 && styles.arcToggleTextActive,
+                brightness[0] > 0 && styles.arcToggleTextActive,
               ]}
             >
-              {brightness[0] > 10 ? 'ВКЛ' : 'ВЫКЛ'}
+              {brightness[0] > 0 ? 'ВКЛ' : 'ВЫКЛ'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -188,11 +206,15 @@ export default function ControlScreen({
       </LiquidGlassCard>
 
       {/* ARC 1: BOTTOM-LEFT */}
-      <LiquidGlassCard compact={true} isActive={brightness[1] > 10}>
+      <LiquidGlassCard
+        compact={true}
+        isActive={brightness[1] > 0 && !isMasterZero}
+        style={isMasterZero ? styles.arcCardDimmed : undefined}
+      >
         <View style={styles.arcCardHeader}>
           <View style={styles.arcInfo}>
             <View
-              style={[styles.arcDot, brightness[1] > 10 && styles.arcDotActive]}
+              style={[styles.arcDot, brightness[1] > 0 && styles.arcDotActive]}
             />
             <Text style={styles.arcTitle}>НИЗ-ЛЕВО (5 LED)</Text>
             <Text
@@ -205,18 +227,20 @@ export default function ControlScreen({
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.arcToggleBtn, brightness[1] > 10 && styles.arcToggleBtnActive]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: brightness[1] > 0 }}
+            style={[styles.arcToggleBtn, brightness[1] > 0 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(1)}
             activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text
               style={[
                 styles.arcToggleText,
-                brightness[1] > 10 && styles.arcToggleTextActive,
+                brightness[1] > 0 && styles.arcToggleTextActive,
               ]}
             >
-              {brightness[1] > 10 ? 'ВКЛ' : 'ВЫКЛ'}
+              {brightness[1] > 0 ? 'ВКЛ' : 'ВЫКЛ'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -233,11 +257,15 @@ export default function ControlScreen({
       </LiquidGlassCard>
 
       {/* ARC 2: RIGHT */}
-      <LiquidGlassCard compact={true} isActive={brightness[2] > 10}>
+      <LiquidGlassCard
+        compact={true}
+        isActive={brightness[2] > 0 && !isMasterZero}
+        style={isMasterZero ? styles.arcCardDimmed : undefined}
+      >
         <View style={styles.arcCardHeader}>
           <View style={styles.arcInfo}>
             <View
-              style={[styles.arcDot, brightness[2] > 10 && styles.arcDotActive]}
+              style={[styles.arcDot, brightness[2] > 0 && styles.arcDotActive]}
             />
             <Text style={styles.arcTitle}>ПРАВЫЙ (11 LED)</Text>
             <Text
@@ -250,18 +278,20 @@ export default function ControlScreen({
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.arcToggleBtn, brightness[2] > 10 && styles.arcToggleBtnActive]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: brightness[2] > 0 }}
+            style={[styles.arcToggleBtn, brightness[2] > 0 && styles.arcToggleBtnActive]}
             onPress={() => onArcToggle && onArcToggle(2)}
             activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text
               style={[
                 styles.arcToggleText,
-                brightness[2] > 10 && styles.arcToggleTextActive,
+                brightness[2] > 0 && styles.arcToggleTextActive,
               ]}
             >
-              {brightness[2] > 10 ? 'ВКЛ' : 'ВЫКЛ'}
+              {brightness[2] > 0 ? 'ВКЛ' : 'ВЫКЛ'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -287,7 +317,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 14,
     paddingTop: 2,
-    paddingBottom: 16,
+    paddingBottom: 120,
     gap: 4,
   },
   masterRow: {
@@ -300,16 +330,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
+    paddingRight: 8,
   },
   statusDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#444450',
+    backgroundColor: '#565666',
   },
   statusDotActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
+    backgroundColor: GlyphColors.neonRed,
+    shadowColor: GlyphColors.neonRed,
     shadowRadius: 6,
     shadowOpacity: 1,
   },
@@ -317,10 +348,11 @@ const styles = StyleSheet.create({
     fontFamily: 'NDOT57',
     fontSize: 11,
     color: '#FFFFFF',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
+    flexShrink: 1,
   },
   masterBtn: {
-    minWidth: 44,
+    minWidth: 50,
     minHeight: 28,
     justifyContent: 'center',
     alignItems: 'center',
@@ -343,13 +375,12 @@ const styles = StyleSheet.create({
   },
   masterBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
+    fontSize: 9.5,
     color: '#FFFFFF',
     letterSpacing: 0.8,
   },
   masterBtnTextActive: {
     color: '#000000',
-    fontWeight: 'bold',
   },
   divider: {
     height: 1,
@@ -383,25 +414,41 @@ const styles = StyleSheet.create({
   },
   presetBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#8E8E98',
+    fontSize: 9.5,
+    color: GlyphColors.textSecondary,
   },
   presetBtnTextActive: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 1,
-    marginBottom: -1,
+    marginTop: 5,
+    marginBottom: 1,
   },
   sectionHeader: {
     fontFamily: 'NDOT57',
-    fontSize: 9,
-    color: '#D0D0DC',
+    fontSize: 9.5,
+    color: GlyphColors.textSecondary,
     letterSpacing: 1.2,
+  },
+  masterZeroBadge: {
+    backgroundColor: 'rgba(215, 25, 32, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 46, 59, 0.55)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+  },
+  masterZeroBadgeText: {
+    fontFamily: 'NDOT57',
+    fontSize: 8.5,
+    color: '#FF7078',
+    letterSpacing: 0.6,
+  },
+  arcCardDimmed: {
+    opacity: 0.65,
   },
   arcCardHeader: {
     flexDirection: 'row',
@@ -419,7 +466,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#40404C',
+    backgroundColor: '#565666',
   },
   arcDotActive: {
     backgroundColor: '#FFFFFF',
@@ -436,14 +483,14 @@ const styles = StyleSheet.create({
   arcPercent: {
     fontFamily: 'NDOT57',
     fontSize: 10,
-    color: '#8E8E98',
+    color: GlyphColors.textSecondary,
     letterSpacing: 0.8,
   },
   arcPercentActive: {
     color: '#FFFFFF',
   },
   arcToggleBtn: {
-    minWidth: 44,
+    minWidth: 50,
     minHeight: 28,
     justifyContent: 'center',
     alignItems: 'center',
@@ -465,11 +512,10 @@ const styles = StyleSheet.create({
   },
   arcToggleText: {
     fontFamily: 'NDOT57',
-    fontSize: 8.5,
+    fontSize: 9,
     color: '#FFFFFF',
   },
   arcToggleTextActive: {
     color: '#000000',
-    fontWeight: 'bold',
   },
 });

@@ -11,6 +11,8 @@ module.exports = function withNothingGlyph(config) {
     const permissions = [
       'com.nothing.ketchum.permission.ENABLE',
       'com.nothing.glyph.permission.GLYPH',
+      'android.permission.RECORD_AUDIO',
+      'android.permission.MODIFY_AUDIO_SETTINGS',
     ];
     for (const perm of permissions) {
       if (!androidManifest['uses-permission'].some((p) => p.$?.['android:name'] === perm)) {

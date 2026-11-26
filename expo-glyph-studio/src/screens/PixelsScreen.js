@@ -11,11 +11,32 @@ import LiquidGlassCard from '../components/LiquidGlassCard';
 import GlyphSlider from '../components/GlyphSlider';
 import { GlyphColors } from '../theme/colors';
 
+const MODES = [
+  { id: 'forward', label: 'ВПЕРЕД' },
+  { id: 'comet', label: 'КОМЕТА' },
+  { id: 'reverse', label: 'НАЗАД' },
+  { id: 'pingpong', label: 'МАЯТНИК' },
+  { id: 'random', label: 'ИСКРЫ' },
+  { id: 'shimmer', label: 'БЛЕСК' },
+];
+
+const SPEED_PRESETS = [
+  { label: '1мс ГИПЕР', val: 1 },
+  { label: '5мс ТУРБО', val: 5 },
+  { label: '20мс', val: 20 },
+  { label: '60мс', val: 60 },
+  { label: '120мс', val: 120 },
+];
+
+// Normalized full-circle duration factor across 36 LEDs (41° + 48° + 21° = 110°)
+const CYCLE_STEP_FACTOR = 36.66;
+
 /**
  * Screen 2: «АВТО-ОБХОД»
- * Ultra-fast circular 36 micro-LED animation engine with real-time speed regulation down to 5ms.
+ * Ultra-fast circular 36 micro-LED animation engine with real-time speed regulation
+ * from 1ms hyper-stream (60 FPS phase-accumulated) to 200ms precision crawl.
  */
-export default function PixelsScreen({
+function PixelsScreen({
   isAutoWalk = false,
   onToggleAutoWalk,
   autoWalkSpeed = 60,
@@ -23,19 +44,22 @@ export default function PixelsScreen({
   autoWalkMode = 'forward',
   onAutoWalkModeChange,
 }) {
+  const safeSpeed = Math.max(1, Math.min(200, Math.round(autoWalkSpeed || 60)));
+  const isStreamMode = safeSpeed < 16;
+  const cycleMs = safeSpeed * CYCLE_STEP_FACTOR;
+  const revsPerSec = 1000 / cycleMs;
+
+  const speedReadout =
+    autoWalkMode === 'shimmer'
+      ? `${safeSpeed} мс • БЛЕСК`
+      : revsPerSec >= 1
+      ? `${revsPerSec.toFixed(1)} об/с`
+      : `${(cycleMs / 1000).toFixed(1)} с/круг (${revsPerSec.toFixed(2)} об/с)`;
+
   const handleSpeedPreset = (ms) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onAutoWalkSpeedChange && onAutoWalkSpeedChange(ms);
   };
-
-  const modes = [
-    { id: 'forward', label: 'ВПЕРЕД' },
-    { id: 'comet', label: 'КОМЕТА' },
-    { id: 'reverse', label: 'НАЗАД' },
-    { id: 'pingpong', label: 'МАЯТНИК' },
-    { id: 'random', label: 'ИСКРЫ' },
-    { id: 'shimmer', label: 'БЛЕСК' },
-  ];
 
   return (
     <ScrollView
@@ -64,7 +88,7 @@ export default function PixelsScreen({
 
         {/* Mode Selector */}
         <View style={styles.modesRow}>
-          {modes.map((m) => {
+          {MODES.map((m) => {
             const isSelected = autoWalkMode === m.id;
             return (
               <TouchableOpacity
@@ -77,6 +101,9 @@ export default function PixelsScreen({
                 activeOpacity={0.7}
               >
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                   style={[
                     styles.modeBtnText,
                     isSelected && styles.modeBtnTextActive,
@@ -94,19 +121,19 @@ export default function PixelsScreen({
         {/* Real-time Step Speed Slider with Turbo Speeds */}
         <GlyphSlider
           label="СКОРОСТЬ ШАГА АНИМАЦИИ"
-          value={autoWalkSpeed}
+          value={safeSpeed}
           min={1}
           max={200}
           step={1}
           unit=" мс"
           displayValue={
-            autoWalkSpeed === 1
+            safeSpeed === 1
               ? '1 мс (ГИПЕР)'
-              : autoWalkSpeed <= 5
-              ? `${autoWalkSpeed} мс (ТУРБО)`
-              : autoWalkSpeed <= 20
-              ? `${autoWalkSpeed} мс (БЫСТРО)`
-              : `${autoWalkSpeed} мс / шаг`
+              : safeSpeed <= 5
+              ? `${safeSpeed} мс (ТУРБО)`
+              : safeSpeed <= 20
+              ? `${safeSpeed} мс (БЫСТРО)`
+              : `${safeSpeed} мс / шаг`
           }
           accentColor={GlyphColors.neonCyan}
           onValueChange={(newSpeed) => {
@@ -114,16 +141,44 @@ export default function PixelsScreen({
           }}
         />
 
+        {/* Real-Time Telemetry Badge Row */}
+        <View style={styles.telemetryRow}>
+          <View style={styles.telemetryBadge}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={styles.telemetryLabel}
+            >
+              ШАГ: {safeSpeed} мс
+            </Text>
+          </View>
+          <View style={styles.telemetryBadge}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={styles.telemetryValue}
+            >
+              {speedReadout}
+            </Text>
+          </View>
+          <View style={[styles.telemetryBadge, isStreamMode && styles.telemetryBadgeActive]}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={[styles.telemetryLabel, isStreamMode && styles.telemetryLabelActive]}
+            >
+              {isStreamMode ? 'ПОТОК 60 FPS' : 'ТОЧНЫЙ ШАГ'}
+            </Text>
+          </View>
+        </View>
+
         {/* Speed Presets */}
         <View style={styles.speedPresetsRow}>
-          {[
-            { label: '1мс ГИПЕР', val: 1 },
-            { label: '5мс ТУРБО', val: 5 },
-            { label: '20мс БЫСТРО', val: 20 },
-            { label: '60мс СТАНДАРТ', val: 60 },
-            { label: '120мс ПЛАВНО', val: 120 },
-          ].map((item) => {
-            const isSelected = autoWalkSpeed === item.val;
+          {SPEED_PRESETS.map((item) => {
+            const isSelected = safeSpeed === item.val;
             return (
               <TouchableOpacity
                 key={item.label}
@@ -140,6 +195,8 @@ export default function PixelsScreen({
                     isSelected && styles.speedPresetTextActive,
                   ]}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
                   {item.label}
                 </Text>
@@ -147,10 +204,16 @@ export default function PixelsScreen({
             );
           })}
         </View>
+
+        <Text style={styles.speedHintText}>
+          Меньше мс — быстрее вращение • 1–15 мс: плавный поток без рывков
+        </Text>
       </LiquidGlassCard>
     </ScrollView>
   );
 }
+
+export default React.memo(PixelsScreen);
 
 const styles = StyleSheet.create({
   container: {
@@ -175,6 +238,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   autoWalkBtn: {
+    minHeight: 34,
+    justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderRadius: 9,
     paddingHorizontal: 14,
@@ -200,7 +265,6 @@ const styles = StyleSheet.create({
   },
   autoWalkBtnTextActive: {
     color: '#000000',
-    fontWeight: 'bold',
   },
   modesRow: {
     flexDirection: 'row',
@@ -211,8 +275,9 @@ const styles = StyleSheet.create({
   modeBtn: {
     flexBasis: '31%',
     flexGrow: 1,
+    minHeight: 40,
     paddingVertical: 7,
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -231,18 +296,52 @@ const styles = StyleSheet.create({
   },
   modeBtnText: {
     fontFamily: 'NDOT57',
-    fontSize: 8,
-    color: '#8E8E98',
+    fontSize: 8.5,
+    color: '#A4A4B6',
     letterSpacing: 0.6,
   },
   modeBtnTextActive: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
   },
   divider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginVertical: 10,
+  },
+  telemetryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 5,
+    marginTop: 6,
+  },
+  telemetryBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+  },
+  telemetryBadgeActive: {
+    backgroundColor: 'rgba(0, 229, 255, 0.12)',
+    borderColor: 'rgba(0, 229, 255, 0.45)',
+  },
+  telemetryLabel: {
+    fontFamily: 'NDOT57',
+    fontSize: 7.5,
+    color: '#A4A4B6',
+    letterSpacing: 0.5,
+  },
+  telemetryLabelActive: {
+    color: GlyphColors.neonCyan,
+  },
+  telemetryValue: {
+    fontFamily: 'NDOT57',
+    fontSize: 7.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   speedPresetsRow: {
     flexDirection: 'row',
@@ -251,8 +350,9 @@ const styles = StyleSheet.create({
   },
   speedPresetBtn: {
     flex: 1,
+    minHeight: 40,
     paddingVertical: 7,
-    paddingHorizontal: 2,
+    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -271,11 +371,19 @@ const styles = StyleSheet.create({
   },
   speedPresetText: {
     fontFamily: 'NDOT57',
-    fontSize: 7,
-    color: '#8E8E98',
+    fontSize: 7.5,
+    color: '#A4A4B6',
+    textAlign: 'center',
   },
   speedPresetTextActive: {
     color: GlyphColors.neonCyan,
-    fontWeight: 'bold',
+  },
+  speedHintText: {
+    fontFamily: 'NDOT57',
+    fontSize: 7.5,
+    color: '#A4A4B6',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
