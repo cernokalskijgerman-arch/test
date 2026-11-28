@@ -56,8 +56,8 @@ const PRESETS = {
 
 const TRACK_CONFIG = [
   { key: 'topleft', label: 'В-ЛЕВО', color: '#FFFFFF' },
-  { key: 'bottomleft', label: 'Н-ЛЕВО', color: GlyphColors.neonRed },
-  { key: 'right', label: 'ПРАВО', color: GlyphColors.neonCyan },
+  { key: 'bottomleft', label: 'Н-ЛЕВО', color: '#FFFFFF' },
+  { key: 'right', label: 'ПРАВО', color: '#FFFFFF' },
 ];
 
 const BPM_QUICK_PRESETS = [80, 110, 128, 140, 175];
@@ -214,7 +214,7 @@ const buildPixelWaveLevels = (step, tlLevel, blLevel, rLevel) => {
  * Screen 3: «СЕКВЕНСОР» (Матрица полей)
  * Responsive 8-step rhythmic pattern matrix across all 3 Glyph arcs or 36 micro-LEDs.
  */
-export default function SequencerScreen({
+function SequencerScreen({
   brightness,
   onBrightnessChange,
   onPixelLevelsChange,
@@ -849,7 +849,6 @@ export default function SequencerScreen({
       {/* 2. ADAPTIVE 8-STEP RHYTHM MATRIX (3 TRACKS, FITS 360DP)      */}
       {/* ============================================================ */}
       <LiquidGlassCard compact style={styles.matrixCard}>
-        <ScrollView horizontal={false} showsHorizontalScrollIndicator={false}>
           <View style={styles.matrix}>
             {/* Bar Markers Row: Такт 1 (1-4) vs Такт 2 (5-8) */}
             <View style={styles.barHeaderRow}>
@@ -861,8 +860,8 @@ export default function SequencerScreen({
                   <Text style={styles.barGroupText}>ТАКТ 1–4</Text>
                 </View>
                 <View style={styles.barDividerSpacer} />
-                <View style={[styles.barGroupBadge, styles.barGroupBadgeSecond]}>
-                  <Text style={styles.barGroupSecondText}>ТАКТ 5–8</Text>
+                <View style={styles.barGroupBadge}>
+                  <Text style={styles.barGroupText}>ТАКТ 5–8</Text>
                 </View>
               </View>
             </View>
@@ -899,7 +898,6 @@ export default function SequencerScreen({
                         style={[
                           styles.stepNumBox,
                           i === 4 && styles.barSplitGap,
-                          i >= 4 && styles.stepNumSecondBar,
                           isDownbeat && styles.stepNumQuarter,
                           isActiveCol && styles.stepNumActive,
                         ]}
@@ -931,10 +929,15 @@ export default function SequencerScreen({
                       activeOpacity={0.65}
                     >
                       <View style={styles.trackLabelLine}>
-                        <View style={[styles.trackArcMarker, { backgroundColor: track.color }]} />
+                        <View
+                          style={[
+                            styles.trackArcMarker,
+                            { opacity: lvl === 0 ? 0.2 : Math.max(0.35, lvl / 100) },
+                          ]}
+                        />
                         <View style={styles.trackTextCol}>
                           <Text
-                            style={[styles.trackLabel, { color: track.color === '#FFFFFF' ? '#FFFFFF' : '#E8E8F2' }]}
+                            style={styles.trackLabel}
                             numberOfLines={1}
                             adjustsFontSizeToFit
                             minimumFontScale={0.8}
@@ -944,7 +947,7 @@ export default function SequencerScreen({
                           <Text
                             style={[
                               styles.trackLevelTag,
-                              { color: lvl === 0 ? GlyphColors.neonRed : track.color },
+                              { opacity: lvl === 0 ? 0.45 : 0.85 },
                             ]}
                             numberOfLines={1}
                           >
@@ -958,9 +961,8 @@ export default function SequencerScreen({
                       {rowValues.map((val, i) => {
                         const isOn = val > 0;
                         const isActiveCol = isPlaying && currentStep === i;
-                        const isBarStart = i % 4 === 0;
                         const cellOpacity = isOn
-                          ? Math.max(0.28, (stepIntensity / 100) * (lvl / 100))
+                          ? Math.max(0.30, (stepIntensity / 100) * (lvl / 100))
                           : 1;
                         return (
                           <TouchableOpacity
@@ -968,16 +970,9 @@ export default function SequencerScreen({
                             style={[
                               styles.stepCell,
                               i === 4 && styles.barSplitGap,
-                              i >= 4 && !isOn && styles.stepCellSecondBar,
-                              isBarStart && !isOn && styles.stepCellDownbeat,
                               isOn && [
                                 styles.stepCellOn,
-                                {
-                                  backgroundColor: track.color,
-                                  borderColor: track.color,
-                                  shadowColor: track.color,
-                                  opacity: cellOpacity,
-                                },
+                                { opacity: cellOpacity },
                               ],
                               isActiveCol && (isOn ? styles.stepCellPlayingOn : styles.stepCellPlaying),
                             ]}
@@ -992,7 +987,6 @@ export default function SequencerScreen({
               })}
             </View>
           </View>
-        </ScrollView>
       </LiquidGlassCard>
 
       {/* ============================================================ */}
@@ -1337,9 +1331,9 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   activeColumnHighlight: {
-    backgroundColor: 'rgba(215, 25, 32, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(215, 25, 32, 0.36)',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
   },
   stepHeaderRow: {
     flexDirection: 'row',
@@ -1360,6 +1354,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 20,
     borderRadius: 1.5,
+    backgroundColor: '#FFFFFF',
   },
   trackTextCol: {
     flex: 1,
@@ -1420,7 +1415,9 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.50)',
   },
   stepNumActive: {
-    backgroundColor: GlyphColors.nothingRed,
+    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.65)',
     borderRadius: 5,
   },
   stepNumText: {
@@ -1447,7 +1444,7 @@ const styles = StyleSheet.create({
   trackLevelTag: {
     fontFamily: 'NDOT57',
     fontSize: 6.5,
-    color: GlyphColors.neonCyan,
+    color: '#D8D8E6',
     letterSpacing: 0.4,
     marginTop: 1,
   },
@@ -1455,17 +1452,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 28,
     borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderTopColor: 'rgba(255, 255, 255, 0.30)',
-  },
-  stepCellSecondBar: {
-    backgroundColor: 'rgba(0, 229, 255, 0.05)',
-    borderColor: 'rgba(0, 229, 255, 0.18)',
-  },
-  stepCellDownbeat: {
-    borderColor: 'rgba(255, 255, 255, 0.32)',
+    borderTopColor: 'rgba(255, 255, 255, 0.28)',
   },
   stepCellOn: {
     backgroundColor: '#FFFFFF',
@@ -1477,16 +1467,16 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   stepCellPlaying: {
-    borderColor: GlyphColors.nothingRed,
-    borderWidth: 1.6,
-    backgroundColor: 'rgba(215, 25, 32, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.65)',
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   stepCellPlayingOn: {
-    borderColor: GlyphColors.nothingRed,
+    borderColor: '#FFFFFF',
     borderWidth: 2,
-    shadowColor: GlyphColors.nothingRed,
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.95,
+    shadowRadius: 10,
   },
   dynamicsCard: {
     paddingVertical: 4,
@@ -1535,3 +1525,5 @@ const styles = StyleSheet.create({
     color: GlyphColors.neonCyan,
   },
 });
+
+export default React.memo(SequencerScreen);

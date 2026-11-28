@@ -132,7 +132,7 @@ const getPixelZoneName = (p) => {
  * Strobe beacon, Visual Countdown Timer, Battery HUD (real + test),
  * Zen 4-7-8 Breathing, ITU-R Morse Beacon, Precision Arcade, Roulette & Reflex Test.
  */
-export default function UtilitiesScreen({
+function UtilitiesScreen({
   brightness,
   onBrightnessChange,
   onActivePixelChange,
@@ -2501,3 +2501,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default React.memo(UtilitiesScreen);

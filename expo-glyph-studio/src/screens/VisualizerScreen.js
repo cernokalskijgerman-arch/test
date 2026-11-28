@@ -32,7 +32,7 @@ const ZERO_PIXELS = new Array(36).fill(0);
 const EQ_SEGMENTS = 12;
 const SEGMENT_INDICES = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 
-export default function VisualizerScreen({
+function VisualizerScreen({
   brightness,
   onBrightnessChange,
   onActivePixelChange,
@@ -1152,3 +1152,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 });
+
+export default React.memo(VisualizerScreen);

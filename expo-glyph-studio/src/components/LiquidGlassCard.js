@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
  * Incorporates hardware-accelerated blur, physical specular sheen gradient,
  * chamfered top rim highlight, and tactile spring micro-compression.
  */
-export default function LiquidGlassCard({
+function LiquidGlassCard({
   children,
   style,
   onPress,
@@ -26,7 +26,7 @@ export default function LiquidGlassCard({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const sheenAnim = useRef(new Animated.Value(0)).current;
 
-  const handlePressIn = () => {
+  const handlePressIn = useCallback(() => {
     if (!onPress) return;
     Animated.parallel([
       Animated.spring(scaleAnim, {
@@ -41,9 +41,9 @@ export default function LiquidGlassCard({
         useNativeDriver: true,
       }),
     ]).start();
-  };
+  }, [onPress, scaleAnim, sheenAnim]);
 
-  const handlePressOut = () => {
+  const handlePressOut = useCallback(() => {
     if (!onPress) return;
     Animated.parallel([
       Animated.spring(scaleAnim, {
@@ -58,7 +58,7 @@ export default function LiquidGlassCard({
         useNativeDriver: true,
       }),
     ]).start();
-  };
+  }, [onPress, scaleAnim, sheenAnim]);
 
   const isPill = variant === 'pill';
   const isCompact = variant === 'compact' || compact;
@@ -168,6 +168,8 @@ export default function LiquidGlassCard({
 
   return cardContent;
 }
+
+export default React.memo(LiquidGlassCard);
 
 const styles = StyleSheet.create({
   outerContainer: {

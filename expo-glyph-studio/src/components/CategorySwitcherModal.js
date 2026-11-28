@@ -35,7 +35,7 @@ const CATEGORY_ICONS = [
  * Implemented as an in-tree overlay to guarantee 100% crash-free,
  * freeze-free operation across Android and iOS (no OS Dialog Window collisions).
  */
-export default function CategorySwitcherModal({
+function CategorySwitcherModal({
   visible,
   categories = [],
   currentTab,
@@ -424,3 +424,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+export default React.memo(CategorySwitcherModal);

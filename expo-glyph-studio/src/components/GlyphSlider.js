@@ -20,7 +20,7 @@ const calculateSteppedValue = (raw, min, max, step) => {
  * even mid-screen-transition, vertical ScrollView disambiguation, zero boundary
  * hysteresis (instant reverse from min/max), and NaN/undefined safety.
  */
-export default function GlyphSlider({
+function GlyphSlider({
   label,
   value,
   min = 0,
@@ -456,3 +456,5 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
 });
+
+export default React.memo(GlyphSlider);

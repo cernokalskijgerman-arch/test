@@ -51,6 +51,19 @@ const COMPACT_LABEL_BY_RAW = {
   'СЕКВЕНСОР': 'РИТМ',
 };
 
+const TAB_HIT_SLOP = { top: 8, bottom: 8, left: 0, right: 0 };
+const PILL_SPRING_CONFIG = {
+  mass: 0.55,
+  damping: 19,
+  stiffness: 220,
+  overshootClamping: false,
+};
+const SCRUB_SPRING_CONFIG = {
+  mass: 0.35,
+  damping: 16,
+  stiffness: 280,
+};
+
 /**
  * Floating Glassmorphic Tab Bar with Liquid Glass refraction,
  * dynamic sliding indicator pill, smooth 1:1 press-and-drag scrubbing across tabs,
@@ -88,6 +101,7 @@ export function FloatingTabBar({
 
   const lastActiveIndexRef = useRef(activeIndex);
   const isScrubbingRef = useRef(false);
+  const scrubActivatedRef = useRef(false);
   if (!isScrubbingRef.current) {
     lastActiveIndexRef.current = activeIndex;
   }
@@ -117,12 +131,7 @@ export function FloatingTabBar({
 
   useEffect(() => {
     if (!isScrubbingRef.current) {
-      translateX.value = withSpring(activeIndex * TAB_WIDTH, {
-        mass: 0.6,
-        damping: 18,
-        stiffness: 180,
-        overshootClamping: false,
-      });
+      translateX.value = withSpring(activeIndex * TAB_WIDTH, PILL_SPRING_CONFIG);
     }
   }, [activeIndex, TAB_WIDTH, translateX]);
 
@@ -170,13 +179,18 @@ export function FloatingTabBar({
   }, []);
 
   const handlePress = useCallback((index) => {
+    if (isScrubbingRef.current || scrubActivatedRef.current) {
+      return;
+    }
     if (activeIndexRef.current === index) {
       return;
     }
     lastActiveIndexRef.current = index;
+    const pillTabW = tabWidthRef.current > 0 ? tabWidthRef.current : (widthRef.current / (tabCountRef.current || 5));
+    translateX.value = withSpring(index * pillTabW, PILL_SPRING_CONFIG);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     dispatchTabSelect(index);
-  }, [dispatchTabSelect]);
+  }, [dispatchTabSelect, translateX]);
 
   const processScrubEvent = useCallback((evt) => {
     const fallbackW = widthRef.current > 0 ? widthRef.current : (width - paddingHorizontal * 2 - 2);
@@ -214,19 +228,10 @@ export function FloatingTabBar({
 
   const finishScrub = useCallback(() => {
     isScrubbingRef.current = false;
-    scrubActive.value = withSpring(0, {
-      mass: 0.4,
-      damping: 16,
-      stiffness: 260,
-    });
+    scrubActive.value = withSpring(0, SCRUB_SPRING_CONFIG);
     const finalIdx = lastActiveIndexRef.current;
     const pillTabW = tabWidthRef.current > 0 ? tabWidthRef.current : (widthRef.current / (tabCountRef.current || 5));
-    translateX.value = withSpring(finalIdx * pillTabW, {
-      mass: 0.6,
-      damping: 18,
-      stiffness: 180,
-      overshootClamping: false,
-    });
+    translateX.value = withSpring(finalIdx * pillTabW, PILL_SPRING_CONFIG);
   }, [scrubActive, translateX]);
 
   const scrubResponder = useRef(
@@ -234,6 +239,7 @@ export function FloatingTabBar({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => {
         touchStartTimeRef.current = Date.now();
+        scrubActivatedRef.current = false;
         measureBarWindow();
         return false;
       },
@@ -242,29 +248,24 @@ export function FloatingTabBar({
         const absDx = Math.abs(gestureState.dx);
         const absDy = Math.abs(gestureState.dy);
         const heldMs = Date.now() - touchStartTimeRef.current;
-        if (absDx > 6 && absDx >= absDy * 0.9) return true;
-        if (heldMs > 160 && absDx > 3 && absDx >= absDy * 0.7) return true;
+        if (absDx > 6 && absDx >= absDy * 0.85) return true;
+        if (heldMs > 140 && absDx > 2 && absDx >= absDy * 0.7) return true;
         return false;
       },
       onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: (evt) => {
         isScrubbingRef.current = true;
-        scrubActive.value = withSpring(1, {
-          mass: 0.3,
-          damping: 16,
-          stiffness: 300,
-        });
+        scrubActivatedRef.current = true;
+        scrubActive.value = withSpring(1, SCRUB_SPRING_CONFIG);
         measureBarWindow();
         processScrubEvent(evt);
       },
       onPanResponderMove: (evt) => {
         if (!isScrubbingRef.current) {
           isScrubbingRef.current = true;
-          scrubActive.value = withSpring(1, {
-            mass: 0.3,
-            damping: 16,
-            stiffness: 300,
-          });
+          scrubActivatedRef.current = true;
+          scrubActive.value = withSpring(1, SCRUB_SPRING_CONFIG);
         }
         processScrubEvent(evt);
       },
@@ -394,7 +395,7 @@ export function FloatingTabBar({
                 accessibilityRole="tab"
                 accessibilityState={{ selected: isFocused }}
                 accessibilityLabel={rawLabel || label}
-                hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+                hitSlop={TAB_HIT_SLOP}
                 onPress={() => handlePress(index)}
                 style={[styles.tab, { width: TAB_WIDTH }]}
               >
@@ -419,13 +420,13 @@ const TabItem = React.memo(function TabItem({
   label,
   IconComponent,
 }) {
-  const iconScale = useSharedValue(isFocused ? 1.0 : 0.9);
+  const iconScale = useSharedValue(isFocused ? 1.06 : 0.92);
 
   useEffect(() => {
-    iconScale.value = withSpring(isFocused ? 1.0 : 0.9, {
-      mass: 0.5,
-      damping: 12,
-      stiffness: 200,
+    iconScale.value = withSpring(isFocused ? 1.06 : 0.92, {
+      mass: 0.45,
+      damping: 14,
+      stiffness: 240,
     });
   }, [isFocused, iconScale]);
 
@@ -442,8 +443,8 @@ const TabItem = React.memo(function TabItem({
         {IconComponent && (
           <IconComponent
             color={color}
-            size={isFocused ? 20 : 18}
-            strokeWidth={isFocused ? 2.3 : 1.8}
+            size={19}
+            strokeWidth={isFocused ? 2.2 : 1.8}
           />
         )}
       </Animated.View>

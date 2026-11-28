@@ -16,7 +16,7 @@ import { GlyphColors } from '../theme/colors';
  * Master Power, Master Brightness, Individual Arc Dimmers.
  * Compact layout optimized for zero vertical scrolling on >= 780dp screens.
  */
-export default function ControlScreen({
+function ControlScreen({
   brightness = [255, 255, 255],
   masterBrightness = 255,
   onMasterBrightnessChange,
@@ -519,3 +519,5 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 });
+
+export default React.memo(ControlScreen);

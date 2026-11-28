@@ -147,6 +147,11 @@ function StudioApp() {
   const masterBrightnessRef = useRef(masterBrightness);
   masterBrightnessRef.current = masterBrightness;
 
+  // Authoritative owner of the physical Glyph output ('control' | 'autowalk' | 'sequencer' | 'visualizer' | 'utilities')
+  // Decouples hardware glyph lifecycle from UI tab navigation so switching tabs NEVER flickers or interrupts glyphs.
+  const glyphOwnerRef = useRef('control');
+  const lastHwSignatureRef = useRef('');
+
   // Isolated animation cursor refs (NEVER overwritten by React activePixel state on render)
   const walkPositionRef = useRef(-1);
   const walkDirectionRef = useRef(1); // 1 = forward, -1 = reverse for pingpong
@@ -182,24 +187,52 @@ function StudioApp() {
     return undefined;
   }, [masterBrightness, pulseAnim]);
 
+  const stopAutoWalkInternal = useCallback(() => {
+    if (isAutoWalkRef.current) {
+      isAutoWalkRef.current = false;
+      setIsAutoWalk(false);
+    }
+    if (stepTimerRef.current) {
+      clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+    walkPositionRef.current = -1;
+    walkDirectionRef.current = 1;
+    walkPhaseAccRef.current = 0;
+    lastTickTimeRef.current = 0;
+    lastScheduledDelayRef.current = 0;
+    walkRenderTypeRef.current = null;
+    trailHistoryRef.current = [];
+  }, []);
+
   // Toggle individual arc
   const handleArcPress = useCallback((arcIndex) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    glyphOwnerRef.current = 'control';
+    stopAutoWalkInternal();
+    setActivePixel(null);
+    setPixelLevels(null);
+    setEffectBrightness(null);
     setBrightness((prev) => {
       const next = [...prev];
       next[arcIndex] = next[arcIndex] > 0 ? 0 : 255;
       return next;
     });
-  }, []);
+  }, [stopAutoWalkInternal]);
 
   // Individual arc brightness regulation
   const handleArcBrightnessChange = useCallback((arcIndex, newVal) => {
+    glyphOwnerRef.current = 'control';
+    stopAutoWalkInternal();
+    setActivePixel(null);
+    setPixelLevels(null);
+    setEffectBrightness(null);
     setBrightness((prev) => {
       const next = [...prev];
       next[arcIndex] = newVal;
       return next;
     });
-  }, []);
+  }, [stopAutoWalkInternal]);
 
   // Master brightness handler: instant 0-cutoff, instant revival > 0, never freezes
   const handleMasterBrightnessChange = useCallback((newVal) => {
@@ -209,6 +242,11 @@ function StudioApp() {
 
   const handleAllOn = useCallback((val = 255) => {
     const target = val > 0 ? val : 255;
+    glyphOwnerRef.current = 'control';
+    stopAutoWalkInternal();
+    setActivePixel(null);
+    setPixelLevels(null);
+    setEffectBrightness(null);
     setMasterBrightness(target);
     masterBrightnessRef.current = target;
     // Revive arcs only if all are currently 0; preserve custom balance otherwise
@@ -218,20 +256,19 @@ function StudioApp() {
       }
       return prev;
     });
-  }, []);
+  }, [stopAutoWalkInternal]);
 
   const handleAllOff = useCallback(() => {
+    glyphOwnerRef.current = 'control';
+    stopAutoWalkInternal();
     setMasterBrightness(0);
     masterBrightnessRef.current = 0;
     setActivePixel(null);
     setPixelLevels(null);
     setEffectBrightness(null);
     NothingGlyph.turnOff();
-    if (isAutoWalkRef.current) {
-      isAutoWalkRef.current = false;
-      setIsAutoWalk(false);
-    }
-  }, []);
+    lastHwSignatureRef.current = 'off';
+  }, [stopAutoWalkInternal]);
 
   // Auto-revive master brightness to 255 ONLY when explicitly starting an effect while master is 0
   const ensurePowerOnIfZero = useCallback(() => {
@@ -243,10 +280,6 @@ function StudioApp() {
 
   // Non-destructive effect brightness controller (never overwrites ControlScreen's brightness)
   const handleEffectBrightnessChange = useCallback((nextVal) => {
-    if (currentTabRef.current === 0) {
-      setEffectBrightness(null);
-      return;
-    }
     if (nextVal === null || nextVal === undefined) {
       setEffectBrightness(null);
     } else if (Array.isArray(nextVal)) {
@@ -260,11 +293,6 @@ function StudioApp() {
 
   // Step-by-step / discrete micro-LED navigation
   const handleActivePixelChange = useCallback((pixelId) => {
-    if (currentTabRef.current === 0) {
-      setActivePixel(null);
-      setEffectBrightness(null);
-      return;
-    }
     if (pixelId === null || pixelId === undefined) {
       // Only null returns control back to normal arc brightness
       setActivePixel(null);
@@ -283,15 +311,63 @@ function StudioApp() {
 
   // Direct pixel levels controller (for games, visualizers, and animations)
   const handlePixelLevelsChange = useCallback((levels) => {
-    if (currentTabRef.current === 0) {
-      setPixelLevels(null);
-      return;
-    }
     setPixelLevels(levels);
     if (levels !== null) {
       setActivePixel(null);
     }
   }, []);
+
+  const claimGlyphOwner = useCallback((owner) => {
+    glyphOwnerRef.current = owner;
+    if (owner !== 'autowalk') {
+      stopAutoWalkInternal();
+    }
+    ensurePowerOnIfZero();
+  }, [stopAutoWalkInternal, ensurePowerOnIfZero]);
+
+  const sequencerHandlers = useMemo(() => ({
+    onEnsurePowerOn: () => claimGlyphOwner('sequencer'),
+    onBrightnessChange: (val) => {
+      if (glyphOwnerRef.current !== 'sequencer') return;
+      handleEffectBrightnessChange(val);
+    },
+    onPixelLevelsChange: (levels) => {
+      if (glyphOwnerRef.current !== 'sequencer') return;
+      handlePixelLevelsChange(levels);
+    },
+  }), [claimGlyphOwner, handleEffectBrightnessChange, handlePixelLevelsChange]);
+
+  const visualizerHandlers = useMemo(() => ({
+    onEnsurePowerOn: () => claimGlyphOwner('visualizer'),
+    onBrightnessChange: (val) => {
+      if (glyphOwnerRef.current !== 'visualizer') return;
+      handleEffectBrightnessChange(val);
+    },
+    onActivePixelChange: (px) => {
+      if (glyphOwnerRef.current !== 'visualizer') return;
+      handleActivePixelChange(px);
+    },
+    onPixelLevelsChange: (levels) => {
+      if (glyphOwnerRef.current !== 'visualizer') return;
+      handlePixelLevelsChange(levels);
+    },
+  }), [claimGlyphOwner, handleEffectBrightnessChange, handleActivePixelChange, handlePixelLevelsChange]);
+
+  const utilitiesHandlers = useMemo(() => ({
+    onEnsurePowerOn: () => claimGlyphOwner('utilities'),
+    onBrightnessChange: (val) => {
+      if (glyphOwnerRef.current !== 'utilities') return;
+      handleEffectBrightnessChange(val);
+    },
+    onActivePixelChange: (px) => {
+      if (glyphOwnerRef.current !== 'utilities') return;
+      handleActivePixelChange(px);
+    },
+    onPixelLevelsChange: (levels) => {
+      if (glyphOwnerRef.current !== 'utilities') return;
+      handlePixelLevelsChange(levels);
+    },
+  }), [claimGlyphOwner, handleEffectBrightnessChange, handleActivePixelChange, handlePixelLevelsChange]);
 
   // Auto-walk step executor with monotonic clock, angular normalization, and 60fps phase-accumulated stream
   const triggerWalkStep = useCallback(() => {
@@ -465,25 +541,19 @@ function StudioApp() {
     isAutoWalkRef.current = next;
     setIsAutoWalk(next);
     if (next) {
+      glyphOwnerRef.current = 'autowalk';
       ensurePowerOnIfZero();
       setEffectBrightness([0, 0, 0]);
     } else {
-      if (stepTimerRef.current) {
-        clearTimeout(stepTimerRef.current);
-        stepTimerRef.current = null;
+      stopAutoWalkInternal();
+      if (glyphOwnerRef.current === 'autowalk') {
+        glyphOwnerRef.current = 'control';
+        setActivePixel(null);
+        setPixelLevels(null);
+        setEffectBrightness(null);
       }
-      walkPositionRef.current = -1;
-      walkDirectionRef.current = 1;
-      walkPhaseAccRef.current = 0;
-      lastTickTimeRef.current = 0;
-      lastScheduledDelayRef.current = 0;
-      walkRenderTypeRef.current = null;
-      trailHistoryRef.current = [];
-      setActivePixel(null);
-      setPixelLevels(null);
-      setEffectBrightness(null);
     }
-  }, [ensurePowerOnIfZero]);
+  }, [ensurePowerOnIfZero, stopAutoWalkInternal]);
 
   // Smooth auto-walk speed update without jumping cursor or forcing synchronous steps mid-drag
   const handleAutoWalkSpeedChange = useCallback((newSpeed) => {
@@ -555,60 +625,32 @@ function StudioApp() {
     };
   }, [isAutoWalk, triggerWalkStep]);
 
-  // Tab switch with smooth directional slide, scale pop, and clean state isolation
+  // Tab switch: updates ONLY the UI view; hardware glyph state and active animations continue uninterrupted
   const handleTabSwitch = useCallback((tabIndex) => {
     setIsCategorySwitcherOpen(false);
     const cur = currentTabRef.current;
     if (tabIndex === cur) return;
     Haptics.selectionAsync().catch(() => {});
 
-    // Synchronously update tab ref BEFORE unmounting effect screens so cleanup cannot clobber Tab 0
     currentTabRef.current = tabIndex;
 
-    // Clean up auto-walk & active effect states on tab exit
-    if (cur === 1 && tabIndex !== 1) {
-      isAutoWalkRef.current = false;
-      setIsAutoWalk(false);
-      if (stepTimerRef.current) {
-        clearTimeout(stepTimerRef.current);
-        stepTimerRef.current = null;
-      }
-      walkPositionRef.current = -1;
-      walkDirectionRef.current = 1;
-      walkPhaseAccRef.current = 0;
-      lastTickTimeRef.current = 0;
-      lastScheduledDelayRef.current = 0;
-      walkRenderTypeRef.current = null;
-      trailHistoryRef.current = [];
-    }
-
-    setActivePixel(null);
-    setPixelLevels(null);
-    setEffectBrightness(null);
-
     const direction = tabIndex > cur ? 1 : -1;
-    screenTranslateX.setValue(direction * 36);
-    screenFadeAnim.setValue(0.35);
-    screenScaleAnim.setValue(0.96);
+    screenTranslateX.setValue(direction * 18);
+    screenFadeAnim.setValue(0.88);
+    screenScaleAnim.setValue(1);
 
     setCurrentTab(tabIndex);
 
     Animated.parallel([
       Animated.spring(screenTranslateX, {
         toValue: 0,
-        tension: 140,
-        friction: 14,
-        useNativeDriver: true,
-      }),
-      Animated.spring(screenScaleAnim, {
-        toValue: 1,
-        tension: 150,
-        friction: 15,
+        tension: 210,
+        friction: 22,
         useNativeDriver: true,
       }),
       Animated.timing(screenFadeAnim, {
         toValue: 1,
-        duration: 180,
+        duration: 130,
         useNativeDriver: true,
       }),
     ]).start();
@@ -621,19 +663,19 @@ function StudioApp() {
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return (
-          Math.abs(gestureState.dx) > 40 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2.2
-        );
+        const absDx = Math.abs(gestureState.dx);
+        const absDy = Math.abs(gestureState.dy);
+        const isFlick = Math.abs(gestureState.vx) > 0.35 && absDx > 22;
+        return (absDx > 40 || isFlick) && absDx > absDy * 2.0;
       },
       onPanResponderTerminationRequest: () => true,
       onPanResponderRelease: (_, gestureState) => {
         const cur = currentTabRef.current;
-        if (gestureState.dx < -45) {
+        if (gestureState.dx < -35 || (gestureState.vx < -0.35 && gestureState.dx < -18)) {
           if (cur < TABS.length - 1) {
             handleTabSwitch(cur + 1);
           }
-        } else if (gestureState.dx > 45) {
+        } else if (gestureState.dx > 35 || (gestureState.vx > 0.35 && gestureState.dx > 18)) {
           if (cur > 0) {
             handleTabSwitch(cur - 1);
           }
@@ -679,27 +721,49 @@ function StudioApp() {
     NothingGlyph.initHardware();
   }, []);
 
-  // Hardware synchronization: streams all UI updates directly to physical Nothing Phone Glyphs
+  // Hardware synchronization: streams all UI updates directly to physical Nothing Phone Glyphs (deduplicated)
   useEffect(() => {
     if (masterBrightness === 0) {
-      NothingGlyph.turnOff();
+      if (lastHwSignatureRef.current !== 'off') {
+        lastHwSignatureRef.current = 'off';
+        NothingGlyph.turnOff();
+      }
       return;
     }
 
     if (effectivePixelLevels !== null && Array.isArray(effectivePixelLevels)) {
-      NothingGlyph.setPixelLevels(effectivePixelLevels);
+      let sig = 'lvls:';
+      for (let i = 0; i < effectivePixelLevels.length; i++) {
+        sig += Math.round(effectivePixelLevels[i] * 255) + ',';
+      }
+      if (lastHwSignatureRef.current !== sig) {
+        lastHwSignatureRef.current = sig;
+        NothingGlyph.setPixelLevels(effectivePixelLevels);
+      }
     } else if (activePixel !== null) {
       if (Array.isArray(activePixel)) {
-        NothingGlyph.setVirtualPixels(activePixel, masterBrightness);
+        const sig = `pxs:${activePixel.join(',')}@${masterBrightness}`;
+        if (lastHwSignatureRef.current !== sig) {
+          lastHwSignatureRef.current = sig;
+          NothingGlyph.setVirtualPixels(activePixel, masterBrightness);
+        }
       } else {
-        NothingGlyph.setVirtualPixel(activePixel, masterBrightness);
+        const sig = `px:${activePixel}@${masterBrightness}`;
+        if (lastHwSignatureRef.current !== sig) {
+          lastHwSignatureRef.current = sig;
+          NothingGlyph.setVirtualPixel(activePixel, masterBrightness);
+        }
       }
     } else {
-      NothingGlyph.setArcsBrightness(
-        effectiveBrightness[0],
-        effectiveBrightness[1],
-        effectiveBrightness[2]
-      );
+      const sig = `arcs:${effectiveBrightness[0]},${effectiveBrightness[1]},${effectiveBrightness[2]}`;
+      if (lastHwSignatureRef.current !== sig) {
+        lastHwSignatureRef.current = sig;
+        NothingGlyph.setArcsBrightness(
+          effectiveBrightness[0],
+          effectiveBrightness[1],
+          effectiveBrightness[2]
+        );
+      }
     }
   }, [effectiveBrightness, activePixel, effectivePixelLevels, masterBrightness]);
 
@@ -764,7 +828,7 @@ function StudioApp() {
         />
       </View>
 
-      {/* Active Screen View with Swipe Gestures & Smooth Spring Transition Animation */}
+      {/* Active Screen View with Swipe Gestures & Keep-Alive Tab Pages (zero mount/unmount flicker) */}
       <Animated.View
         style={[
           styles.screenContainer,
@@ -778,7 +842,10 @@ function StudioApp() {
         ]}
         {...panResponder.panHandlers}
       >
-        {currentTab === 0 && (
+        <View
+          style={currentTab === 0 ? styles.tabPageVisible : styles.tabPageHidden}
+          pointerEvents={currentTab === 0 ? 'auto' : 'none'}
+        >
           <ControlScreen
             brightness={brightness}
             masterBrightness={masterBrightness}
@@ -788,8 +855,11 @@ function StudioApp() {
             onAllOn={handleAllOn}
             onAllOff={handleAllOff}
           />
-        )}
-        {currentTab === 1 && (
+        </View>
+        <View
+          style={currentTab === 1 ? styles.tabPageVisible : styles.tabPageHidden}
+          pointerEvents={currentTab === 1 ? 'auto' : 'none'}
+        >
           <PixelsScreen
             isAutoWalk={isAutoWalk}
             onToggleAutoWalk={handleToggleAutoWalk}
@@ -798,35 +868,44 @@ function StudioApp() {
             autoWalkMode={autoWalkMode}
             onAutoWalkModeChange={handleAutoWalkModeChange}
           />
-        )}
-        {currentTab === 2 && (
+        </View>
+        <View
+          style={currentTab === 2 ? styles.tabPageVisible : styles.tabPageHidden}
+          pointerEvents={currentTab === 2 ? 'auto' : 'none'}
+        >
           <SequencerScreen
             brightness={brightness}
-            onBrightnessChange={handleEffectBrightnessChange}
-            onPixelLevelsChange={handlePixelLevelsChange}
-            onEnsurePowerOn={ensurePowerOnIfZero}
+            onBrightnessChange={sequencerHandlers.onBrightnessChange}
+            onPixelLevelsChange={sequencerHandlers.onPixelLevelsChange}
+            onEnsurePowerOn={sequencerHandlers.onEnsurePowerOn}
             savedState={sequencerState}
             onSaveState={setSequencerState}
           />
-        )}
-        {currentTab === 3 && (
+        </View>
+        <View
+          style={currentTab === 3 ? styles.tabPageVisible : styles.tabPageHidden}
+          pointerEvents={currentTab === 3 ? 'auto' : 'none'}
+        >
           <VisualizerScreen
             brightness={brightness}
-            onBrightnessChange={handleEffectBrightnessChange}
-            onActivePixelChange={handleActivePixelChange}
-            onPixelLevelsChange={handlePixelLevelsChange}
-            onEnsurePowerOn={ensurePowerOnIfZero}
+            onBrightnessChange={visualizerHandlers.onBrightnessChange}
+            onActivePixelChange={visualizerHandlers.onActivePixelChange}
+            onPixelLevelsChange={visualizerHandlers.onPixelLevelsChange}
+            onEnsurePowerOn={visualizerHandlers.onEnsurePowerOn}
           />
-        )}
-        {currentTab === 4 && (
+        </View>
+        <View
+          style={currentTab === 4 ? styles.tabPageVisible : styles.tabPageHidden}
+          pointerEvents={currentTab === 4 ? 'auto' : 'none'}
+        >
           <UtilitiesScreen
             brightness={brightness}
-            onBrightnessChange={handleEffectBrightnessChange}
-            onActivePixelChange={handleActivePixelChange}
-            onPixelLevelsChange={handlePixelLevelsChange}
-            onEnsurePowerOn={ensurePowerOnIfZero}
+            onBrightnessChange={utilitiesHandlers.onBrightnessChange}
+            onActivePixelChange={utilitiesHandlers.onActivePixelChange}
+            onPixelLevelsChange={utilitiesHandlers.onPixelLevelsChange}
+            onEnsurePowerOn={utilitiesHandlers.onEnsurePowerOn}
           />
-        )}
+        </View>
       </Animated.View>
 
       {/* Floating Glassmorphic Tab Bar (Liquid Glass) positioned at the bottom */}
@@ -936,5 +1015,11 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
+  },
+  tabPageVisible: {
+    flex: 1,
+  },
+  tabPageHidden: {
+    display: 'none',
   },
 });
